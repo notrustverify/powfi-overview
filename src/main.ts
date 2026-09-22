@@ -153,9 +153,9 @@ function render(): void {
       </details>
 
       <footer>
-        <span>ALPH ${formatUsd(d.alphPriceUsd, 4)} · circulating supply ${formatCompact(d.circulatingAlph)} ALPH · data via node.mainnet.alephium.org &amp; CoinGecko</span>
+        <span id="last-updated">Updated ${relativeTime(d.fetchedAt)}</span>
         <span style="display:flex;align-items:center;gap:10px">
-          <span>Updated ${relativeTime(d.fetchedAt)}</span>
+          <span>ALPH ${formatUsd(d.alphPriceUsd, 4)} · circulating supply ${formatCompact(d.circulatingAlph)} ALPH · data via node.mainnet.alephium.org &amp; CoinGecko</span>
           <button class="refresh-btn" id="refresh-btn" ${loading ? 'disabled' : ''}>${loading ? 'Refreshing…' : 'Refresh'}</button>
         </span>
       </footer>
@@ -166,18 +166,32 @@ function render(): void {
   document.querySelector('.advanced')?.addEventListener('toggle', (e) => {
     advancedOpen = (e.target as HTMLDetailsElement).open
   })
+  tick()
+}
+
+function tick(): void {
+  const lastUpdatedEl = document.getElementById('last-updated')
+  const nextRefreshEl = document.getElementById('next-refresh')
+  if (!data || !lastUpdatedEl || !nextRefreshEl) return
+
+  lastUpdatedEl.textContent = `Updated ${relativeTime(data.fetchedAt)}`
+
+  const remainingMs = data.fetchedAt + REFRESH_INTERVAL_MS - Date.now()
+  nextRefreshEl.textContent = loading ? '…' : `in ${Math.max(0, Math.ceil(remainingMs / 1000))}s`
 }
 
 function header(): string {
+  const logoUrl = `${import.meta.env.BASE_URL}alephium-logo.svg`
   return `
     <div class="topbar">
-      <img class="logo-mark" src="/alephium-logo.svg" alt="Alephium" />
+      <img class="logo-mark" src="${logoUrl}" alt="Alephium" />
       <span class="pill">Round 0</span>
     </div>
     <div class="hero">
       <span class="pill">Live · Alephium mainnet</span>
       <h1>PowFi <span class="accent">Round 0</span> goals.</h1>
       <p>Tracking the ALPH × USDT farming and xALPH staking campaign targets live, straight from Alephium mainnet.</p>
+      <div class="live-indicator"><span class="live-dot"></span>Auto-refresh <span id="next-refresh">in ${REFRESH_INTERVAL_MS / 1000}s</span></div>
     </div>
   `
 }
@@ -199,3 +213,4 @@ async function load(): Promise<void> {
 
 void load()
 setInterval(() => void load(), REFRESH_INTERVAL_MS)
+setInterval(tick, 1000)
