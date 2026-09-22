@@ -50,9 +50,9 @@ body {
 }
 
 .logo-mark {
-  width: 34px;
-  height: 34px;
-  color: var(--ink);
+  height: 28px;
+  width: auto;
+  display: block;
 }
 
 .pill {
@@ -148,32 +148,6 @@ section.block {
   padding: 20px 22px;
 }
 
-.stat {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.stat .value {
-  font-size: 26px;
-  font-weight: 800;
-  color: var(--accent);
-  white-space: nowrap;
-}
-
-.stat .label {
-  color: var(--ink-muted);
-  font-size: 13px;
-  line-height: 1.35;
-}
-
-.stat .sub {
-  display: block;
-  color: var(--ink-faint);
-  font-size: 12px;
-  margin-top: 2px;
-}
-
 .progress-card .row {
   display: flex;
   align-items: baseline;
@@ -182,9 +156,9 @@ section.block {
 }
 
 .progress-card .row .value {
-  font-size: 22px;
+  font-size: 28px;
   font-weight: 800;
-  color: var(--ink);
+  color: var(--accent);
 }
 
 .progress-card .row .target {
@@ -242,6 +216,87 @@ section.block {
 .reserve-row .amt {
   font-weight: 600;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+details.advanced {
+  margin: 32px 0 44px;
+  border: 1px solid var(--surface-border);
+  border-radius: 16px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+details.advanced summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 16px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+details.advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+details.advanced summary .chevron {
+  color: var(--ink-faint);
+  transition: transform 0.2s ease;
+}
+
+details.advanced[open] summary .chevron {
+  transform: rotate(180deg);
+}
+
+details.advanced summary:hover .chevron {
+  color: var(--accent);
+}
+
+.advanced-body {
+  padding: 4px 22px 22px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 640px) {
+  .advanced-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.adv-group {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--surface-border);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.adv-group h3 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  font-weight: 700;
+}
+
+.adv-group .reserve-row {
+  margin-top: 8px;
+}
+
+.adv-group .addr-link {
+  text-decoration: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.adv-group .addr-link:hover {
+  color: var(--accent);
 }
 
 footer {

@@ -18,30 +18,24 @@ const app = document.querySelector<HTMLDivElement>('#app')!
 let data: DashboardData | null = null
 let errorMessage: string | null = null
 let loading = true
+let advancedOpen = false
 
-function statCard(value: string, label: string, sub?: string): string {
+function progressCard(current: string, currentRaw: number, target: number, targetLabel: string, label: string, full = false): string {
+  const pct = target > 0 ? (currentRaw / target) * 100 : 0
   return `
-    <div class="card stat">
-      <div>
-        <div class="value">${value}</div>
-        <div class="label">${label}${sub ? `<span class="sub">${sub}</span>` : ''}</div>
+    <div class="card progress-card${full ? ' full' : ''}">
+      <div class="row">
+        <span class="value">${current}</span>
+        <span class="target">of ${targetLabel} target</span>
       </div>
+      <div class="bar-track"><div class="bar-fill" style="width:${clampPct(pct)}%"></div></div>
+      <div class="foot"><span>${label} · ${formatPercent(pct, 1)} of target</span><span>${pct < 100 ? 'below target — bonus rate applies' : 'target reached'}</span></div>
     </div>
   `
 }
 
-function progressCard(valueLabel: string, current: number, target: number, targetLabel: string): string {
-  const pct = target > 0 ? (current / target) * 100 : 0
-  return `
-    <div class="card progress-card">
-      <div class="row">
-        <span class="value">${valueLabel}</span>
-        <span class="target">of ${targetLabel} target</span>
-      </div>
-      <div class="bar-track"><div class="bar-fill" style="width:${clampPct(pct)}%"></div></div>
-      <div class="foot"><span>${formatPercent(pct, 1)} of target</span><span>${pct < 100 ? 'below target — bonus rate applies' : 'target reached'}</span></div>
-    </div>
-  `
+function infoRow(label: string, value: string): string {
+  return `<div class="reserve-row"><span class="sym">${label}</span><span class="amt">${value}</span></div>`
 }
 
 function reserveList(pool: PoolData): string {
@@ -50,14 +44,12 @@ function reserveList(pool: PoolData): string {
     ...pool.tokenReserves.map((r) => ({ sym: r.meta.symbol, amt: r.amount })),
   ]
   return `
-    <div class="card full">
-      <div class="reserve-list">
-        ${rows
-          .map(
-            (r) => `<div class="reserve-row"><span class="sym">${r.sym} reserve</span><span class="amt">${formatNumber(r.amt, 4)}</span></div>`,
-          )
-          .join('')}
-      </div>
+    <div class="reserve-list">
+      ${rows
+        .map(
+          (r) => `<div class="reserve-row"><span class="sym">${r.sym} reserve</span><span class="amt">${formatNumber(r.amt, 4)}</span></div>`,
+        )
+        .join('')}
     </div>
   `
 }
@@ -101,47 +93,64 @@ function render(): void {
 
       <section class="block">
         <div class="block-head">
-          <h2>xALPH liquid staking</h2>
-          <a class="addr-link" href="${explorerAddrUrl(XALPH_VAULT_ADDRESS)}" target="_blank" rel="noopener">${shortAddress(XALPH_VAULT_ADDRESS)}</a>
+          <h2>Campaign targets: overview.</h2>
         </div>
         <div class="grid">
-          ${progressCard(`${formatCompact(d.vault.alphStaked)} ALPH`, d.vault.alphStaked, TARGETS.stakedAlph, `${formatCompact(TARGETS.stakedAlph)} ALPH`)}
-          ${statCard(`${formatPercent(TARGETS.stakingApyPct, 0)}`, 'Target APY', 'monthly re-evaluation')}
-          ${statCard(`${formatPercent(stakedPct, 2)}`, 'of circulating ALPH staked', `target ${formatPercent(TARGETS.stakingShareOfCirculatingPct, 0)}`)}
-          ${statCard(`1 xALPH ≈ ${formatNumber(d.vault.redemptionRate, 6)} ALPH`, 'Redemption rate', `${formatCompact(d.vault.xalphIssued)} xALPH issued`)}
+          ${progressCard(`${formatCompact(d.vault.alphStaked)} ALPH`, d.vault.alphStaked, TARGETS.stakedAlph, `${formatCompact(TARGETS.stakedAlph)} ALPH`, 'ALPH staked')}
+          ${progressCard(formatPercent(stakedPct, 2), stakedPct, TARGETS.stakingShareOfCirculatingPct, `${formatPercent(TARGETS.stakingShareOfCirculatingPct, 0)}`, 'of circulating ALPH')}
         </div>
         <p class="note">*While staking sits below target, APY will be significantly higher.</p>
       </section>
 
       <section class="block">
         <div class="block-head">
-          <h2>ALPH × USDT farming pool</h2>
-          <a class="addr-link" href="${explorerAddrUrl(POOL_ALPH_USDT_ADDRESS)}" target="_blank" rel="noopener">${shortAddress(POOL_ALPH_USDT_ADDRESS)}</a>
+          <h2>ALPH × USDT farming: overview.</h2>
         </div>
         <div class="grid">
-          ${progressCard(formatUsd(poolUsdtTvl), poolUsdtTvl, TARGETS.poolTvlUsd, formatUsd(TARGETS.poolTvlUsd))}
-          ${statCard(`${formatPercent(TARGETS.poolApyPct, 0)}`, 'Target APY', 'in-range liquidity only')}
-          ${statCard(impliedAlphPrice !== null ? `$${formatNumber(impliedAlphPrice, 4)}` : '—', 'ALPH price implied by pool', `oracle: $${formatNumber(d.alphPriceUsd, 4)}`)}
-          ${reserveList(d.poolAlphUsdt)}
+          ${progressCard(formatUsd(poolUsdtTvl), poolUsdtTvl, TARGETS.poolTvlUsd, formatUsd(TARGETS.poolTvlUsd), 'Pool TVL', true)}
         </div>
         <p class="note">*While TVL sits below target, early LPs can earn substantially higher APYs.</p>
       </section>
 
-      <section class="block">
-        <div class="block-head">
-          <h2>xALPH × ALPH pool</h2>
-          <a class="addr-link" href="${explorerAddrUrl(POOL_XALPH_ALPH_ADDRESS)}" target="_blank" rel="noopener">${shortAddress(POOL_XALPH_ALPH_ADDRESS)}</a>
+      <details class="advanced" ${advancedOpen ? 'open' : ''}>
+        <summary>Advanced recap<span class="chevron">▾</span></summary>
+        <div class="advanced-body">
+          <div class="adv-group">
+            <h3>Campaign parameters</h3>
+            ${infoRow('Staking target APY', formatPercent(TARGETS.stakingApyPct, 0))}
+            ${infoRow('Farming target APY', formatPercent(TARGETS.poolApyPct, 0))}
+            ${infoRow('Active liquidity', 'In range only')}
+            ${infoRow('Liquidity type', '2-sided required')}
+            ${infoRow('Re-evaluation', 'Monthly')}
+            ${infoRow('xALPH', 'Liquid staked ALPH')}
+          </div>
+          <div class="adv-group">
+            <h3>Staking detail</h3>
+            <div class="reserve-row"><span class="sym">ALPH staked (exact)</span><span class="amt">${formatNumber(d.vault.alphStaked, 4)}</span></div>
+            <div class="reserve-row"><span class="sym">xALPH issued</span><span class="amt">${formatNumber(d.vault.xalphIssued, 4)}</span></div>
+            <div class="reserve-row"><span class="sym">Redemption rate</span><span class="amt">${formatNumber(d.vault.redemptionRate, 8)} ALPH / xALPH</span></div>
+          </div>
+          <div class="adv-group">
+            <h3>ALPH × USDT pool</h3>
+            ${reserveList(d.poolAlphUsdt)}
+            <div class="reserve-row"><span class="sym">ALPH price implied by pool</span><span class="amt">${impliedAlphPrice !== null ? `$${formatNumber(impliedAlphPrice, 4)}` : '—'}</span></div>
+            <div class="reserve-row"><span class="sym">Oracle price (CoinGecko)</span><span class="amt">$${formatNumber(d.alphPriceUsd, 4)}</span></div>
+          </div>
+          <div class="adv-group">
+            <h3>xALPH × ALPH pool</h3>
+            ${reserveList(d.poolXalphAlph)}
+            <div class="reserve-row"><span class="sym">Pool TVL</span><span class="amt">${formatUsd(poolXalphTvl)}</span></div>
+            <div class="reserve-row"><span class="sym">Market price</span><span class="amt">${marketXalphRate !== null ? `1 xALPH ≈ ${formatNumber(marketXalphRate, 6)} ALPH` : '—'}</span></div>
+            <div class="reserve-row"><span class="sym">Peg deviation vs redemption rate</span><span class="amt">${pegDeviationPct !== null ? `${pegDeviationPct >= 0 ? '+' : ''}${formatPercent(pegDeviationPct, 3)}` : '—'}</span></div>
+          </div>
+          <div class="adv-group">
+            <h3>Contracts</h3>
+            <div class="reserve-row"><span class="sym">xALPH vault</span><a class="amt addr-link" href="${explorerAddrUrl(XALPH_VAULT_ADDRESS)}" target="_blank" rel="noopener">${shortAddress(XALPH_VAULT_ADDRESS)}</a></div>
+            <div class="reserve-row"><span class="sym">ALPH/USDT pool</span><a class="amt addr-link" href="${explorerAddrUrl(POOL_ALPH_USDT_ADDRESS)}" target="_blank" rel="noopener">${shortAddress(POOL_ALPH_USDT_ADDRESS)}</a></div>
+            <div class="reserve-row"><span class="sym">xALPH/ALPH pool</span><a class="amt addr-link" href="${explorerAddrUrl(POOL_XALPH_ALPH_ADDRESS)}" target="_blank" rel="noopener">${shortAddress(POOL_XALPH_ALPH_ADDRESS)}</a></div>
+          </div>
         </div>
-        <div class="grid">
-          ${statCard(formatUsd(poolXalphTvl), 'Total value locked')}
-          ${statCard(
-            marketXalphRate !== null ? `1 xALPH ≈ ${formatNumber(marketXalphRate, 6)} ALPH` : '—',
-            'Market price (pool)',
-            pegDeviationPct !== null ? `${pegDeviationPct >= 0 ? '+' : ''}${formatPercent(pegDeviationPct, 3)} vs redemption rate` : undefined,
-          )}
-          ${reserveList(d.poolXalphAlph)}
-        </div>
-      </section>
+      </details>
 
       <footer>
         <span>ALPH ${formatUsd(d.alphPriceUsd, 4)} · circulating supply ${formatCompact(d.circulatingAlph)} ALPH · data via node.mainnet.alephium.org &amp; CoinGecko</span>
@@ -154,20 +163,21 @@ function render(): void {
   `
 
   document.getElementById('refresh-btn')?.addEventListener('click', () => void load())
+  document.querySelector('.advanced')?.addEventListener('toggle', (e) => {
+    advancedOpen = (e.target as HTMLDetailsElement).open
+  })
 }
 
 function header(): string {
   return `
     <div class="topbar">
-      <svg class="logo-mark" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M6 6 L14 16 L6 26 H10.5 L16 19.2 L21.5 26 H26 L18 16 L26 6 H21.5 L16 12.8 L10.5 6 Z" fill="currentColor"/>
-      </svg>
+      <img class="logo-mark" src="/alephium-logo.svg" alt="Alephium" />
       <span class="pill">Round 0</span>
     </div>
     <div class="hero">
       <span class="pill">Live · Alephium mainnet</span>
-      <h1>PowFi <span class="accent">Round 0</span> dashboard.</h1>
-      <p>Live on-chain stats for xALPH liquid staking and the ALPH farming campaign — reserves, TVL and staking targets, read straight from Alephium mainnet.</p>
+      <h1>PowFi <span class="accent">Round 0</span> goals.</h1>
+      <p>Tracking the ALPH × USDT farming and xALPH staking campaign targets live, straight from Alephium mainnet.</p>
     </div>
   `
 }
