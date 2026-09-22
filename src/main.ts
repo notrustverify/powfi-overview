@@ -9,9 +9,11 @@ import {
   EXPLORER_APP_URL,
 } from './chain.ts'
 import type { DashboardData, PoolData } from './chain.ts'
-import { formatCompact, formatUsd, formatNumber, formatPercent, clampPct, shortAddress, relativeTime } from './format.ts'
+import { formatCompact, formatUsd, formatNumber, formatPercent, formatCountdown, clampPct, shortAddress, relativeTime } from './format.ts'
 
-const REFRESH_INTERVAL_MS = 60_000
+const REFRESH_INTERVAL_MS = 120_000
+const POWFI_URL = 'https://powfi.alephium.org'
+const POWFI_FAQ_URL = 'https://docs.alephium.org/powfi/faq'
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 
@@ -56,6 +58,30 @@ function reserveList(pool: PoolData): string {
 
 function explorerAddrUrl(addr: string): string {
   return `${EXPLORER_APP_URL}/addresses/${addr}`
+}
+
+function pegBadge(pegDeviationPct: number | null): string {
+  if (pegDeviationPct === null) return `<span class="peg-badge peg-unknown">no data</span>`
+
+  const abs = Math.abs(pegDeviationPct)
+  const direction = pegDeviationPct >= 0 ? 'premium' : 'discount'
+  const sign = pegDeviationPct >= 0 ? '+' : ''
+  const pctLabel = `${sign}${formatNumber(pegDeviationPct, 2)}%`
+
+  let tier: 'good' | 'warn' | 'critical'
+  let label: string
+  if (abs < 2) {
+    tier = 'good'
+    label = 'healthy peg'
+  } else if (abs < 5) {
+    tier = 'warn'
+    label = `elevated ${direction}`
+  } else {
+    tier = 'critical'
+    label = `large ${direction}`
+  }
+
+  return `<span class="peg-badge peg-${tier}">${label} · ${pctLabel}</span>`
 }
 
 function render(): void {
@@ -123,6 +149,8 @@ function render(): void {
             ${infoRow('Liquidity type', '2-sided required')}
             ${infoRow('Re-evaluation', 'Monthly')}
             ${infoRow('xALPH', 'Liquid staked ALPH')}
+            ${infoRow('Reward source', 'DEX fees + campaign incentives')}
+            ${infoRow('Unstake lock-up', '30 days (linear claim)')}
           </div>
           <div class="adv-group">
             <h3>Staking detail</h3>
@@ -141,7 +169,7 @@ function render(): void {
             ${reserveList(d.poolXalphAlph)}
             <div class="reserve-row"><span class="sym">Pool TVL</span><span class="amt">${formatUsd(poolXalphTvl)}</span></div>
             <div class="reserve-row"><span class="sym">Market price</span><span class="amt">${marketXalphRate !== null ? `1 xALPH ≈ ${formatNumber(marketXalphRate, 6)} ALPH` : '—'}</span></div>
-            <div class="reserve-row"><span class="sym">Peg deviation vs redemption rate</span><span class="amt">${pegDeviationPct !== null ? `${pegDeviationPct >= 0 ? '+' : ''}${formatPercent(pegDeviationPct, 3)}` : '—'}</span></div>
+            <div class="reserve-row"><span class="sym">Peg vs redemption rate</span>${pegBadge(pegDeviationPct)}</div>
           </div>
           <div class="adv-group">
             <h3>Contracts</h3>
@@ -154,8 +182,10 @@ function render(): void {
 
       <footer>
         <span id="last-updated">Updated ${relativeTime(d.fetchedAt)}</span>
-        <span style="display:flex;align-items:center;gap:10px">
+        <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span>ALPH ${formatUsd(d.alphPriceUsd, 4)} · circulating supply ${formatCompact(d.circulatingAlph)} ALPH · data via node.mainnet.alephium.org &amp; CoinGecko</span>
+          <a href="${POWFI_URL}" target="_blank" rel="noopener">powfi.alephium.org ↗</a>
+          <a href="${POWFI_FAQ_URL}" target="_blank" rel="noopener">FAQ ↗</a>
           <button class="refresh-btn" id="refresh-btn" ${loading ? 'disabled' : ''}>${loading ? 'Refreshing…' : 'Refresh'}</button>
         </span>
       </footer>
@@ -165,6 +195,10 @@ function render(): void {
   document.getElementById('refresh-btn')?.addEventListener('click', () => void load())
   document.querySelector('.advanced')?.addEventListener('toggle', (e) => {
     advancedOpen = (e.target as HTMLDetailsElement).open
+  })
+  document.getElementById('theme-toggle')?.addEventListener('click', () => {
+    setTheme(getTheme() === 'dark' ? 'light' : 'dark')
+    render()
   })
   tick()
 }
@@ -177,21 +211,43 @@ function tick(): void {
   lastUpdatedEl.textContent = `Updated ${relativeTime(data.fetchedAt)}`
 
   const remainingMs = data.fetchedAt + REFRESH_INTERVAL_MS - Date.now()
-  nextRefreshEl.textContent = loading ? '…' : `in ${Math.max(0, Math.ceil(remainingMs / 1000))}s`
+  nextRefreshEl.textContent = loading ? '…' : `in ${formatCountdown(Math.ceil(remainingMs / 1000))}`
 }
 
+type Theme = 'light' | 'dark'
+
+function getTheme(): Theme {
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
+}
+
+function setTheme(theme: Theme): void {
+  document.documentElement.dataset.theme = theme
+  try {
+    localStorage.setItem('powfi-theme', theme)
+  } catch {
+    // localStorage unavailable (private mode etc.) — theme just won't persist.
+  }
+}
+
+const SUN_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`
+const MOON_ICON = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 1020.354 15.354Z"/></svg>`
+
 function header(): string {
-  const logoUrl = `${import.meta.env.BASE_URL}alephium-logo.svg`
+  const theme = getTheme()
+  const logoUrl = `${import.meta.env.BASE_URL}${theme === 'dark' ? 'alephium-logo-white.svg' : 'alephium-logo-black.svg'}`
   return `
     <div class="topbar">
-      <img class="logo-mark" src="${logoUrl}" alt="Alephium" />
-      <span class="pill">Round 0</span>
+      <a href="${POWFI_URL}" target="_blank" rel="noopener" title="powfi.alephium.org"><img class="logo-mark" src="${logoUrl}" alt="Alephium" /></a>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="theme-toggle" id="theme-toggle" aria-label="Switch to ${theme === 'dark' ? 'light' : 'dark'} theme" title="Switch to ${theme === 'dark' ? 'light' : 'dark'} theme">${theme === 'dark' ? SUN_ICON : MOON_ICON}</button>
+        <span class="pill">Round 0</span>
+      </div>
     </div>
     <div class="hero">
       <span class="pill">Live · Alephium mainnet</span>
       <h1>PowFi <span class="accent">Round 0</span> goals.</h1>
       <p>Tracking the ALPH × USDT farming and xALPH staking campaign targets live, straight from Alephium mainnet.</p>
-      <div class="live-indicator"><span class="live-dot"></span>Auto-refresh <span id="next-refresh">in ${REFRESH_INTERVAL_MS / 1000}s</span></div>
+      <div class="live-indicator"><span class="live-dot"></span>Auto-refresh <span id="next-refresh">in ${formatCountdown(REFRESH_INTERVAL_MS / 1000)}</span></div>
     </div>
   `
 }

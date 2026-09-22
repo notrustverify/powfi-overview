@@ -28,6 +28,14 @@ export function shortAddress(addr: string, head = 6, tail = 6): string {
   return `${addr.slice(0, head)}…${addr.slice(-tail)}`
 }
 
+export function formatCountdown(totalSeconds: number): string {
+  const seconds = Math.max(0, totalSeconds)
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  const rest = seconds % 60
+  return rest === 0 ? `${minutes}m` : `${minutes}m ${rest}s`
+}
+
 export function relativeTime(fromMs: number): string {
   const seconds = Math.round((Date.now() - fromMs) / 1000)
   if (seconds < 5) return 'just now'
