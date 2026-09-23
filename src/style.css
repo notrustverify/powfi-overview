@@ -456,6 +456,25 @@ footer a:hover {
   cursor: default;
 }
 
+.share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.share-btn:hover {
+  background: var(--accent);
+  color: var(--btn-hover-ink);
+}
+
 .banner {
   background: rgba(var(--warn-rgb), 0.09);
   border: 1px solid rgba(var(--warn-rgb), 0.35);
