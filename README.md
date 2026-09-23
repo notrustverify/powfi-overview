@@ -47,5 +47,9 @@ A workflow at `.github/workflows/deploy.yml` builds and publishes `dist/` on eve
 2. In the repo's **Settings → Pages**, set **Source** to **GitHub Actions**.
 3. Push to `main` (or run the workflow manually from the Actions tab).
 
-The build sets Vite's `base` to `/<repo-name>/` automatically from the workflow, so it works
-for any repository name without editing `vite.config.ts`.
+The workflow sets Vite's `base` to `/` for the custom domain
+`https://powfi.notrustverify.ch`. Configure that hostname in **Settings → Pages →
+Custom domain**. Asset URLs must start at the domain root, without `/powfi-overview/`.
+
+If switching back to a `https://<owner>.github.io/<repo-name>/` project URL, change
+the workflow's `VITE_BASE` to `/<repo-name>/` and rebuild.

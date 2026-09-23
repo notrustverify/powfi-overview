@@ -1,8 +1,7 @@
 import { defineConfig } from 'vite'
 
-// GitHub Pages serves a project site from /<repo-name>/, so the deploy
-// workflow passes VITE_BASE=/<repo-name>/ at build time. Local dev and
-// previews fall back to root.
+// The custom domain serves the site from root. VITE_BASE can override
+// this for deployments under a subpath (e.g. /powfi-overview/).
 export default defineConfig({
   base: process.env.VITE_BASE ?? '/',
 })
