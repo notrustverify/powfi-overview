@@ -60,12 +60,6 @@ function explorerAddrUrl(addr: string): string {
   return `${EXPLORER_APP_URL}/addresses/${addr}`
 }
 
-function reserveRatioEstimate(pegDeviationPct: number | null): string {
-  if (pegDeviationPct === null) return '—'
-  const sign = pegDeviationPct >= 0 ? '+' : ''
-  return `${sign}${formatNumber(pegDeviationPct, 2)}%`
-}
-
 function render(): void {
   const bannerHtml = errorMessage
     ? `<div class="banner">Live data temporarily unavailable (${errorMessage}). ${data ? 'Showing last known values.' : ''}</div>`
@@ -86,13 +80,6 @@ function render(): void {
   const stakedPct = (d.vault.alphStaked / d.circulatingAlph) * 100
   const poolUsdtTvl = poolTvlUsd(d.poolAlphUsdt, d.alphPriceUsd, d.vault.redemptionRate)
   const poolXalphTvl = poolTvlUsd(d.poolXalphAlph, d.alphPriceUsd, d.vault.redemptionRate)
-
-  const xalphAlphReserve = d.poolXalphAlph.tokenReserves.find((r) => r.meta.symbol === 'XALPH')
-  const marketXalphRate = xalphAlphReserve && xalphAlphReserve.amount > 0 ? d.poolXalphAlph.alphReserve / xalphAlphReserve.amount : null
-  const pegDeviationPct = marketXalphRate !== null ? ((marketXalphRate - d.vault.redemptionRate) / d.vault.redemptionRate) * 100 : null
-
-  const impliedAlphUsdt = d.poolAlphUsdt.tokenReserves.find((r) => r.meta.symbol === 'USDT')
-  const impliedAlphPrice = impliedAlphUsdt && d.poolAlphUsdt.alphReserve > 0 ? impliedAlphUsdt.amount / d.poolAlphUsdt.alphReserve : null
 
   app.innerHTML = `
     <div class="page">
@@ -143,16 +130,14 @@ function render(): void {
           <div class="adv-group">
             <h3>ALPH × USDT pool</h3>
             ${reserveList(d.poolAlphUsdt)}
-            <div class="reserve-row"><span class="sym">ALPH price implied by pool</span><span class="amt">${impliedAlphPrice !== null ? `$${formatNumber(impliedAlphPrice, 4)}` : '—'}</span></div>
-            <div class="reserve-row"><span class="sym">Oracle price (CoinGecko)</span><span class="amt">$${formatNumber(d.alphPriceUsd, 4)}</span></div>
+            <div class="reserve-row"><span class="sym">ALPH price (CoinGecko)</span><span class="amt">$${formatNumber(d.alphPriceUsd, 4)}</span></div>
+            <p class="adv-caveat">Reserves and TVL are direct on-chain balances. This pool's actual swap price isn't derivable from those reserves alone — check the swap page on <a href="${POWFI_URL}" target="_blank" rel="noopener">powfi.alephium.org</a> for a live quote.</p>
           </div>
           <div class="adv-group">
             <h3>xALPH × ALPH pool</h3>
             ${reserveList(d.poolXalphAlph)}
             <div class="reserve-row"><span class="sym">Pool TVL</span><span class="amt">${formatUsd(poolXalphTvl)}</span></div>
-            <div class="reserve-row"><span class="sym">Reserve-ratio price (est.)</span><span class="amt">${marketXalphRate !== null ? `1 xALPH ≈ ${formatNumber(marketXalphRate, 6)} ALPH` : '—'}</span></div>
-            <div class="reserve-row"><span class="sym">vs. redemption rate</span><span class="amt">${reserveRatioEstimate(pegDeviationPct)}</span></div>
-            <p class="adv-caveat">Estimated from total pool reserves, not a live swap quote — for concentrated-liquidity pools this can diverge a lot from the price you'd actually get. Check the swap page on <a href="${POWFI_URL}" target="_blank" rel="noopener">powfi.alephium.org</a> for real pricing.</p>
+            <p class="adv-caveat">Reserves and TVL are direct on-chain balances. This pool's actual swap price isn't derivable from those reserves alone — check the swap page on <a href="${POWFI_URL}" target="_blank" rel="noopener">powfi.alephium.org</a> for a live quote.</p>
           </div>
           <div class="adv-group">
             <h3>Contracts</h3>
