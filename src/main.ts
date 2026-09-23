@@ -1,7 +1,6 @@
 import './style.css'
 import {
   fetchDashboardData,
-  poolTvlUsd,
   TARGETS,
   XALPH_VAULT_ADDRESS,
   POOL_ALPH_USDT_ADDRESS,
@@ -78,8 +77,12 @@ function render(): void {
 
   const d = data
   const stakedPct = (d.vault.alphStaked / d.circulatingAlph) * 100
-  const poolUsdtTvl = poolTvlUsd(d.poolAlphUsdt, d.alphPriceUsd, d.vault.redemptionRate)
-  const poolXalphTvl = poolTvlUsd(d.poolXalphAlph, d.alphPriceUsd, d.vault.redemptionRate)
+  const poolUsdtTvl = d.poolAlphUsdt.price.tvlUsd
+  const poolXalphTvl = d.poolXalphAlph.price.tvlUsd
+
+  // pool2's token0/token1 is ALPH/xALPH, so price1Per0 is xALPH per ALPH — invert for ALPH per xALPH.
+  const xalphSpotRate = 1 / d.poolXalphAlph.price.price1Per0
+  const xalphPegDeviationPct = ((xalphSpotRate - d.vault.redemptionRate) / d.vault.redemptionRate) * 100
 
   app.innerHTML = `
     <div class="page">
@@ -129,15 +132,20 @@ function render(): void {
           </div>
           <div class="adv-group">
             <h3>ALPH × USDT pool</h3>
-            ${reserveList(d.poolAlphUsdt)}
-            <div class="reserve-row"><span class="sym">ALPH price (CoinGecko)</span><span class="amt">$${formatNumber(d.alphPriceUsd, 4)}</span></div>
-            <p class="adv-caveat">Reserves and TVL are direct on-chain balances. This pool's actual swap price isn't derivable from those reserves alone — check the swap page on <a href="${POWFI_URL}" target="_blank" rel="noopener">powfi.alephium.org</a> for a live quote.</p>
+            ${reserveList(d.poolAlphUsdt.reserves)}
+            <div class="reserve-row"><span class="sym">Spot price (pool)</span><span class="amt">$${formatNumber(d.poolAlphUsdt.price.price1Per0, 4)}</span></div>
+            <div class="reserve-row"><span class="sym">Spot price (CoinGecko)</span><span class="amt">$${formatNumber(d.alphPriceUsd, 4)}</span></div>
+            <div class="reserve-row"><span class="sym">Trading fee</span><span class="amt">${formatPercent(d.poolAlphUsdt.price.feeRatePct, 2)}</span></div>
+            <p class="adv-caveat">Spot price is read from the pool's current tick, pre-fee — not the same as raw reserve ratio, which is meaningless for a concentrated-liquidity pool.</p>
           </div>
           <div class="adv-group">
             <h3>xALPH × ALPH pool</h3>
-            ${reserveList(d.poolXalphAlph)}
+            ${reserveList(d.poolXalphAlph.reserves)}
             <div class="reserve-row"><span class="sym">Pool TVL</span><span class="amt">${formatUsd(poolXalphTvl)}</span></div>
-            <p class="adv-caveat">Reserves and TVL are direct on-chain balances. This pool's actual swap price isn't derivable from those reserves alone — check the swap page on <a href="${POWFI_URL}" target="_blank" rel="noopener">powfi.alephium.org</a> for a live quote.</p>
+            <div class="reserve-row"><span class="sym">Spot price (pool)</span><span class="amt">1 xALPH ≈ ${formatNumber(xalphSpotRate, 6)} ALPH</span></div>
+            <div class="reserve-row"><span class="sym">vs. redemption rate</span><span class="amt">${xalphPegDeviationPct >= 0 ? '+' : ''}${formatNumber(xalphPegDeviationPct, 2)}%</span></div>
+            <div class="reserve-row"><span class="sym">Trading fee</span><span class="amt">${formatPercent(d.poolXalphAlph.price.feeRatePct, 2)}</span></div>
+            <p class="adv-caveat">Spot price is read from the pool's current tick, pre-fee — actual swap output will be slightly lower after the trading fee and any price impact.</p>
           </div>
           <div class="adv-group">
             <h3>Contracts</h3>

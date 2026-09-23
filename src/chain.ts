@@ -1,14 +1,21 @@
-import { NodeProvider, ExplorerProvider, tokenIdFromAddress, binToHex } from '@alephium/web3'
+import { NodeProvider, ExplorerProvider, tokenIdFromAddress, contractIdFromAddress, binToHex } from '@alephium/web3'
 
 export const NODE_URL = 'https://node.mainnet.alephium.org'
 export const EXPLORER_API_URL = 'https://backend.mainnet.alephium.org'
 export const EXPLORER_APP_URL = 'https://explorer.alephium.org'
+export const POWFI_API_URL = 'https://api.powfi.alephium.org'
 
 export const XALPH_VAULT_ADDRESS = '225WevmFp5ZgzPsyVJTvyp2v2uyKrvp329HfrVmzffnWj'
 export const POOL_ALPH_USDT_ADDRESS = 'xRF7AKLwpGjWzDpFFnUkdXBALKtotFcnD5XFf2EAyioZ'
 export const POOL_XALPH_ALPH_ADDRESS = '22QumTFozFy6HyndPMna2t4KjjVNGYNATgY2reeV2d6nj'
 
 export const XALPH_TOKEN_ID = binToHex(tokenIdFromAddress(XALPH_VAULT_ADDRESS))
+const POOL_ALPH_USDT_ID = binToHex(contractIdFromAddress(POOL_ALPH_USDT_ADDRESS))
+const POOL_XALPH_ALPH_ID = binToHex(contractIdFromAddress(POOL_XALPH_ALPH_ADDRESS))
+
+// xALPH vault contract methods (verified against DefiLlama's production PowFi adapter).
+const VAULT_METHOD_GET_XALPH_SUPPLY = 3
+const VAULT_METHOD_GET_XALPH_BACKING = 13
 
 // Campaign targets, as published for Round 0.
 export const TARGETS = {
@@ -34,6 +41,15 @@ export interface PoolData {
   tokenReserves: { meta: TokenMeta; amount: number }[]
 }
 
+export interface PoolPrice {
+  tvlUsd: number
+  feeRatePct: number
+  token0Symbol: string
+  token1Symbol: string
+  /** Spot price of 1 token0 in token1, read from the pool's current sqrtPriceX96 (pre-fee). */
+  price1Per0: number
+}
+
 export interface DashboardData {
   fetchedAt: number
   alphPriceUsd: number
@@ -43,8 +59,8 @@ export interface DashboardData {
     xalphIssued: number
     redemptionRate: number // ALPH per xALPH
   }
-  poolAlphUsdt: PoolData
-  poolXalphAlph: PoolData
+  poolAlphUsdt: { reserves: PoolData; price: PoolPrice }
+  poolXalphAlph: { reserves: PoolData; price: PoolPrice }
 }
 
 function attoToNumber(atto: string | bigint, decimals: number): number {
@@ -60,6 +76,62 @@ async function fetchAlphPriceUsd(): Promise<number> {
   const price = json?.alephium?.usd
   if (typeof price !== 'number') throw new Error('Unexpected CoinGecko response shape')
   return price
+}
+
+// Reads the vault's own supply/backing getters rather than guessing at raw
+// contract field layout — same methods DefiLlama's production PowFi adapter uses.
+async function fetchVaultStats(
+  nodeProvider: NodeProvider,
+): Promise<{ alphStaked: number; xalphIssued: number; redemptionRate: number }> {
+  const [supplyResult, backingResult] = await Promise.all([
+    nodeProvider.contracts.postContractsCallContract({
+      group: 0,
+      address: XALPH_VAULT_ADDRESS,
+      methodIndex: VAULT_METHOD_GET_XALPH_SUPPLY,
+    }),
+    nodeProvider.contracts.postContractsCallContract({
+      group: 0,
+      address: XALPH_VAULT_ADDRESS,
+      methodIndex: VAULT_METHOD_GET_XALPH_BACKING,
+    }),
+  ])
+  if (!('returns' in supplyResult) || !('returns' in backingResult)) {
+    throw new Error('xALPH vault contract call failed')
+  }
+  const xalphIssued = attoToNumber(supplyResult.returns[0].value as string, ALPH_DECIMALS)
+  const alphStaked = attoToNumber(backingResult.returns[0].value as string, ALPH_DECIMALS)
+  return { alphStaked, xalphIssued, redemptionRate: xalphIssued > 0 ? alphStaked / xalphIssued : 1 }
+}
+
+interface PowfiPoolApiResponse {
+  tvl: number
+  feeRate: number
+  sqrtPriceX96: string
+  token0: { symbol: string; decimals: number }
+  token1: { symbol: string; decimals: number }
+}
+
+// PowFi's own pool API — the same live pool state (sqrtPriceX96, tvl) that
+// powers the swap UI. This is required for concentrated-liquidity pools:
+// their raw on-chain reserves are the sum across every LP's price range and
+// do not reflect the current tradeable price (verified against real swap
+// quotes — a naive reserves ratio was off by 7-40x).
+async function fetchPoolPrice(poolId: string): Promise<PoolPrice> {
+  const res = await fetch(`${POWFI_API_URL}/pools/${poolId}`)
+  if (!res.ok) throw new Error(`PowFi pool API failed: ${res.status}`)
+  const p: PowfiPoolApiResponse = await res.json()
+
+  const Q96 = 2 ** 96
+  const sqrtPrice = Number(BigInt(p.sqrtPriceX96)) / Q96
+  const price1Per0 = sqrtPrice * sqrtPrice * 10 ** (p.token0.decimals - p.token1.decimals)
+
+  return {
+    tvlUsd: Number(p.tvl),
+    feeRatePct: Number(p.feeRate) * 100,
+    token0Symbol: p.token0.symbol,
+    token1Symbol: p.token1.symbol,
+    price1Per0,
+  }
 }
 
 async function fetchPool(
@@ -80,41 +152,31 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   const nodeProvider = new NodeProvider(NODE_URL)
   const explorer = new ExplorerProvider(EXPLORER_API_URL)
 
-  const vaultState = await nodeProvider.contracts.getContractsAddressState(XALPH_VAULT_ADDRESS)
-  const vaultTokenIds = (vaultState.asset.tokens ?? []).map((t) => t.id)
-
-  // Discover every token held across the vault + both pools in one metadata call.
-  const poolAlphUsdtStateProbe = await nodeProvider.contracts.getContractsAddressState(POOL_ALPH_USDT_ADDRESS)
-  const poolXalphAlphStateProbe = await nodeProvider.contracts.getContractsAddressState(POOL_XALPH_ALPH_ADDRESS)
+  const [poolAlphUsdtStateProbe, poolXalphAlphStateProbe] = await Promise.all([
+    nodeProvider.contracts.getContractsAddressState(POOL_ALPH_USDT_ADDRESS),
+    nodeProvider.contracts.getContractsAddressState(POOL_XALPH_ALPH_ADDRESS),
+  ])
   const allTokenIds = Array.from(
     new Set([
-      ...vaultTokenIds,
       ...(poolAlphUsdtStateProbe.asset.tokens ?? []).map((t) => t.id),
       ...(poolXalphAlphStateProbe.asset.tokens ?? []).map((t) => t.id),
     ]),
   )
 
-  const [alphPriceUsd, circulatingAlph, metaList] = await Promise.all([
+  const [alphPriceUsd, circulatingAlph, metaList, vaultStats, poolAlphUsdtPrice, poolXalphAlphPrice] = await Promise.all([
     fetchAlphPriceUsd(),
     explorer.infos.getInfosSupplyCirculatingAlph(),
     explorer.tokens.postTokensFungibleMetadata(allTokenIds),
+    fetchVaultStats(nodeProvider),
+    fetchPoolPrice(POOL_ALPH_USDT_ID),
+    fetchPoolPrice(POOL_XALPH_ALPH_ID),
   ])
 
   const tokenMetaById = new Map<string, TokenMeta>(
     metaList.map((m) => [m.id, { id: m.id, symbol: m.symbol, name: m.name, decimals: Number(m.decimals) }]),
   )
 
-  const alphStaked = attoToNumber(vaultState.asset.attoAlphAmount, ALPH_DECIMALS)
-  // mutFields[0] = totalStaked, mutFields[1] = totalXalphIssued, verified against
-  // the live vault (they track attoAlphAmount almost exactly at genesis parity).
-  // Fall back to a 1:1 peg if the vault's field layout ever changes.
-  const xalphIssuedField = vaultState.mutFields[1]
-  const xalphIssued =
-    xalphIssuedField && typeof xalphIssuedField.value === 'string'
-      ? attoToNumber(xalphIssuedField.value, ALPH_DECIMALS)
-      : alphStaked
-
-  const [poolAlphUsdt, poolXalphAlph] = await Promise.all([
+  const [poolAlphUsdtReserves, poolXalphAlphReserves] = await Promise.all([
     fetchPool(nodeProvider, POOL_ALPH_USDT_ADDRESS, tokenMetaById),
     fetchPool(nodeProvider, POOL_XALPH_ALPH_ADDRESS, tokenMetaById),
   ])
@@ -123,29 +185,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     fetchedAt: Date.now(),
     alphPriceUsd,
     circulatingAlph: Number(circulatingAlph),
-    vault: {
-      alphStaked,
-      xalphIssued,
-      redemptionRate: xalphIssued > 0 ? alphStaked / xalphIssued : 1,
-    },
-    poolAlphUsdt,
-    poolXalphAlph,
+    vault: vaultStats,
+    poolAlphUsdt: { reserves: poolAlphUsdtReserves, price: poolAlphUsdtPrice },
+    poolXalphAlph: { reserves: poolXalphAlphReserves, price: poolXalphAlphPrice },
   }
-}
-
-export function poolTvlUsd(pool: PoolData, alphPriceUsd: number, xalphToAlphRate: number): number {
-  const alphValue = pool.alphReserve * alphPriceUsd
-  const tokenValue = pool.tokenReserves.reduce((sum, r) => {
-    const priceUsd = r.meta.symbol === 'XALPH' ? xalphToAlphRate * alphPriceUsd : usdStablePriceGuess(r.meta.symbol, alphPriceUsd)
-    return sum + r.amount * priceUsd
-  }, 0)
-  return alphValue + tokenValue
-}
-
-function usdStablePriceGuess(symbol: string, alphPriceUsd: number): number {
-  if (/USDT|USDC|DAI/i.test(symbol)) return 1
-  // Unknown, non-stable token held by a pool (e.g. an incentive reserve):
-  // we don't have a price feed for it, so it's excluded from TVL (0).
-  void alphPriceUsd
-  return 0
 }
