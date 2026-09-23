@@ -58,6 +58,8 @@ export interface DashboardData {
     alphStaked: number
     xalphIssued: number
     redemptionRate: number // ALPH per xALPH
+    currentAprPct: number // live 7-day moving-average APR, from PowFi's own staking stats
+    aprIsPartial: boolean
   }
   poolAlphUsdt: { reserves: PoolData; price: PoolPrice }
   poolXalphAlph: { reserves: PoolData; price: PoolPrice }
@@ -101,6 +103,20 @@ async function fetchVaultStats(
   const xalphIssued = attoToNumber(supplyResult.returns[0].value as string, ALPH_DECIMALS)
   const alphStaked = attoToNumber(backingResult.returns[0].value as string, ALPH_DECIMALS)
   return { alphStaked, xalphIssued, redemptionRate: xalphIssued > 0 ? alphStaked / xalphIssued : 1 }
+}
+
+interface PowfiStakingStatsResponse {
+  apr: string
+  isPartial: boolean
+}
+
+// PowFi's own staking stats endpoint — the same one powfi.alephium.org/staking
+// reads for its "APR" stat: a 7-day moving average of realized staking returns.
+async function fetchStakingApr(): Promise<{ currentAprPct: number; aprIsPartial: boolean }> {
+  const res = await fetch(`${POWFI_API_URL}/stats/staking`)
+  if (!res.ok) throw new Error(`PowFi staking stats API failed: ${res.status}`)
+  const s: PowfiStakingStatsResponse = await res.json()
+  return { currentAprPct: Number(s.apr) / 100, aprIsPartial: s.isPartial }
 }
 
 interface PowfiPoolApiResponse {
@@ -163,11 +179,12 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     ]),
   )
 
-  const [alphPriceUsd, circulatingAlph, metaList, vaultStats, poolAlphUsdtPrice, poolXalphAlphPrice] = await Promise.all([
+  const [alphPriceUsd, circulatingAlph, metaList, vaultStats, stakingApr, poolAlphUsdtPrice, poolXalphAlphPrice] = await Promise.all([
     fetchAlphPriceUsd(),
     explorer.infos.getInfosSupplyCirculatingAlph(),
     explorer.tokens.postTokensFungibleMetadata(allTokenIds),
     fetchVaultStats(nodeProvider),
+    fetchStakingApr(),
     fetchPoolPrice(POOL_ALPH_USDT_ID),
     fetchPoolPrice(POOL_XALPH_ALPH_ID),
   ])
@@ -185,7 +202,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     fetchedAt: Date.now(),
     alphPriceUsd,
     circulatingAlph: Number(circulatingAlph),
-    vault: vaultStats,
+    vault: { ...vaultStats, ...stakingApr },
     poolAlphUsdt: { reserves: poolAlphUsdtReserves, price: poolAlphUsdtPrice },
     poolXalphAlph: { reserves: poolXalphAlphReserves, price: poolXalphAlphPrice },
   }

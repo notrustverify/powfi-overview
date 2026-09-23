@@ -132,9 +132,11 @@ function render(): void {
           </div>
           <div class="adv-group">
             <h3>Staking detail</h3>
+            <div class="reserve-row"><span class="sym">Current APR (7d avg)</span><span class="amt">${formatPercent(d.vault.currentAprPct, 2)}</span></div>
             <div class="reserve-row"><span class="sym">ALPH staked (exact)</span><span class="amt">${formatNumber(d.vault.alphStaked, 4)}</span></div>
             <div class="reserve-row"><span class="sym">xALPH issued</span><span class="amt">${formatNumber(d.vault.xalphIssued, 4)}</span></div>
             <div class="reserve-row"><span class="sym">Redemption rate</span><span class="amt">${formatNumber(d.vault.redemptionRate, 8)} ALPH / xALPH</span></div>
+            ${d.vault.aprIsPartial ? '<p class="adv-caveat">APR is still building up a full 7-day window of data — early reading.</p>' : ''}
           </div>
           <div class="adv-group">
             <h3>ALPH × USDT pool</h3>
