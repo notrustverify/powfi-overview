@@ -60,28 +60,10 @@ function explorerAddrUrl(addr: string): string {
   return `${EXPLORER_APP_URL}/addresses/${addr}`
 }
 
-function pegBadge(pegDeviationPct: number | null): string {
-  if (pegDeviationPct === null) return `<span class="peg-badge peg-unknown">no data</span>`
-
-  const abs = Math.abs(pegDeviationPct)
-  const direction = pegDeviationPct >= 0 ? 'premium' : 'discount'
+function reserveRatioEstimate(pegDeviationPct: number | null): string {
+  if (pegDeviationPct === null) return '—'
   const sign = pegDeviationPct >= 0 ? '+' : ''
-  const pctLabel = `${sign}${formatNumber(pegDeviationPct, 2)}%`
-
-  let tier: 'good' | 'warn' | 'critical'
-  let label: string
-  if (abs < 2) {
-    tier = 'good'
-    label = 'healthy peg'
-  } else if (abs < 5) {
-    tier = 'warn'
-    label = `elevated ${direction}`
-  } else {
-    tier = 'critical'
-    label = `large ${direction}`
-  }
-
-  return `<span class="peg-badge peg-${tier}">${label} · ${pctLabel}</span>`
+  return `${sign}${formatNumber(pegDeviationPct, 2)}%`
 }
 
 function render(): void {
@@ -168,8 +150,9 @@ function render(): void {
             <h3>xALPH × ALPH pool</h3>
             ${reserveList(d.poolXalphAlph)}
             <div class="reserve-row"><span class="sym">Pool TVL</span><span class="amt">${formatUsd(poolXalphTvl)}</span></div>
-            <div class="reserve-row"><span class="sym">Market price</span><span class="amt">${marketXalphRate !== null ? `1 xALPH ≈ ${formatNumber(marketXalphRate, 6)} ALPH` : '—'}</span></div>
-            <div class="reserve-row"><span class="sym">Peg vs redemption rate</span>${pegBadge(pegDeviationPct)}</div>
+            <div class="reserve-row"><span class="sym">Reserve-ratio price (est.)</span><span class="amt">${marketXalphRate !== null ? `1 xALPH ≈ ${formatNumber(marketXalphRate, 6)} ALPH` : '—'}</span></div>
+            <div class="reserve-row"><span class="sym">vs. redemption rate</span><span class="amt">${reserveRatioEstimate(pegDeviationPct)}</span></div>
+            <p class="adv-caveat">Estimated from total pool reserves, not a live swap quote — for concentrated-liquidity pools this can diverge a lot from the price you'd actually get. Check the swap page on <a href="${POWFI_URL}" target="_blank" rel="noopener">powfi.alephium.org</a> for real pricing.</p>
           </div>
           <div class="adv-group">
             <h3>Contracts</h3>

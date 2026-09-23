@@ -16,8 +16,6 @@
   --good-rgb: 26, 156, 91;
   --warn: #92660b;
   --warn-rgb: 146, 102, 11;
-  --critical: #c92a2a;
-  --critical-rgb: 201, 42, 42;
   --track: rgba(20, 15, 10, 0.08);
   --card-shadow: 0 1px 2px rgba(20, 15, 10, 0.04), 0 1px 1px rgba(20, 15, 10, 0.03);
   --btn-hover-ink: #ffffff;
@@ -43,8 +41,6 @@
   --good-rgb: 51, 193, 126;
   --warn: #e8b93f;
   --warn-rgb: 232, 185, 63;
-  --critical: #ff6b6b;
-  --critical-rgb: 255, 107, 107;
   --track: rgba(255, 255, 255, 0.08);
   --card-shadow: none;
   --btn-hover-ink: #16100c;
@@ -287,40 +283,6 @@ section.block {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-.peg-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-  border: 1px solid transparent;
-}
-
-.peg-badge.peg-good {
-  color: var(--good);
-  background: rgba(var(--good-rgb), 0.12);
-  border-color: rgba(var(--good-rgb), 0.35);
-}
-
-.peg-badge.peg-warn {
-  color: var(--warn);
-  background: rgba(var(--warn-rgb), 0.12);
-  border-color: rgba(var(--warn-rgb), 0.35);
-}
-
-.peg-badge.peg-critical {
-  color: var(--critical);
-  background: rgba(var(--critical-rgb), 0.12);
-  border-color: rgba(var(--critical-rgb), 0.35);
-}
-
-.peg-badge.peg-unknown {
-  color: var(--ink-faint);
-  background: rgba(var(--ink-rgb), 0.06);
-  border-color: var(--surface-border);
-}
 
 details.advanced {
   margin: 32px 0 44px;
@@ -391,6 +353,22 @@ details.advanced summary:hover .chevron {
 
 .adv-group .reserve-row {
   margin-top: 8px;
+}
+
+.adv-caveat {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ink-faint);
+}
+
+.adv-caveat a {
+  color: var(--ink-faint);
+  text-decoration: underline;
+}
+
+.adv-caveat a:hover {
+  color: var(--accent);
 }
 
 .adv-group .addr-link {
