@@ -9,6 +9,7 @@ import {
 } from './chain.ts'
 import type { DashboardData, PoolData } from './chain.ts'
 import { formatCompact, formatUsd, formatNumber, formatPercent, formatCountdown, clampPct, shortAddress, relativeTime } from './format.ts'
+import { themeToggleButton, bindThemeToggle, logoUrl } from './theme.ts'
 
 const REFRESH_INTERVAL_MS = 120_000
 const POWFI_URL = 'https://powfi.alephium.org'
@@ -180,10 +181,7 @@ function render(): void {
   document.querySelector('.advanced')?.addEventListener('toggle', (e) => {
     advancedOpen = (e.target as HTMLDetailsElement).open
   })
-  document.getElementById('theme-toggle')?.addEventListener('click', () => {
-    setTheme(getTheme() === 'dark' ? 'light' : 'dark')
-    render()
-  })
+  bindThemeToggle(render)
   tick()
 }
 
@@ -198,32 +196,13 @@ function tick(): void {
   nextRefreshEl.textContent = loading ? '…' : `in ${formatCountdown(Math.ceil(remainingMs / 1000))}`
 }
 
-type Theme = 'light' | 'dark'
-
-function getTheme(): Theme {
-  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
-}
-
-function setTheme(theme: Theme): void {
-  document.documentElement.dataset.theme = theme
-  try {
-    localStorage.setItem('powfi-theme', theme)
-  } catch {
-    // localStorage unavailable (private mode etc.) — theme just won't persist.
-  }
-}
-
-const SUN_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`
-const MOON_ICON = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 1020.354 15.354Z"/></svg>`
-
 function header(): string {
-  const theme = getTheme()
-  const logoUrl = `${import.meta.env.BASE_URL}${theme === 'dark' ? 'alephium-logo-white.svg' : 'alephium-logo-black.svg'}`
   return `
     <div class="topbar">
-      <a href="${POWFI_URL}" target="_blank" rel="noopener" title="powfi.alephium.org"><img class="logo-mark" src="${logoUrl}" alt="Alephium" /></a>
+      <a href="${POWFI_URL}" target="_blank" rel="noopener" title="powfi.alephium.org"><img class="logo-mark" src="${logoUrl()}" alt="Alephium" /></a>
       <div style="display:flex;align-items:center;gap:10px">
-        <button class="theme-toggle" id="theme-toggle" aria-label="Switch to ${theme === 'dark' ? 'light' : 'dark'} theme" title="Switch to ${theme === 'dark' ? 'light' : 'dark'} theme">${theme === 'dark' ? SUN_ICON : MOON_ICON}</button>
+        <a class="nav-link" href="${import.meta.env.BASE_URL}activity">Activity</a>
+        ${themeToggleButton()}
         <span class="pill">Round 0</span>
       </div>
     </div>

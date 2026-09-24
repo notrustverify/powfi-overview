@@ -150,6 +150,112 @@ async function fetchPoolPrice(poolId: string): Promise<PoolPrice> {
   }
 }
 
+export type StakingActivityKind = 'stake' | 'unstakeScheduled' | 'unstakeCancelled' | 'rewardDeposited'
+
+export interface StakingActivityEntry {
+  kind: StakingActivityKind
+  txHash: string
+  timestamp: number
+  address: string
+  alphAmount: number
+  xalphAmount: number
+  /** For 'unstakeScheduled' entries: when the ALPH becomes claimable (timestamp + unstakeDuration). */
+  claimableAt?: number
+}
+
+// Event indexes match the XAlphToken contract's declaration order (Staked,
+// UnstakeScheduled, UnstakeCancelled, RewardDeposited) — same source @alephium/powfi-sdk's
+// generated event types are built from.
+const VAULT_EVENT_STAKED = 0
+const VAULT_EVENT_UNSTAKE_SCHEDULED = 1
+const VAULT_EVENT_UNSTAKE_CANCELLED = 2
+const VAULT_EVENT_REWARD_DEPOSITED = 3
+
+// XAlphToken's immutable `unstakeDuration` field, read directly from the vault's
+// on-chain state (30 days, matching the "30 days (linear claim)" campaign parameter).
+const UNSTAKE_DURATION_MS = 30 * 24 * 60 * 60 * 1000
+
+// The explorer API caps a single page at 100 events; larger requests are paged.
+const EXPLORER_EVENTS_PAGE_SIZE = 100
+export const MAX_ACTIVITY_EVENTS = 5000
+
+// Shape of one entry from the explorer's contract-events endpoint — kept local
+// rather than importing the SDK's `Event` type, which isn't exported at the
+// package root (only nested under its `explorer` namespace).
+interface ChainEvent {
+  txHash: string
+  timestamp: number
+  eventIndex: number
+  fields?: { value: unknown }[]
+}
+
+function decodeStakingEvent(e: ChainEvent): StakingActivityEntry | undefined {
+  const v = (e.fields ?? []).map((f) => f.value as string)
+  const base = { txHash: e.txHash, timestamp: e.timestamp }
+  switch (e.eventIndex) {
+    case VAULT_EVENT_STAKED:
+      return {
+        ...base,
+        kind: 'stake',
+        address: v[0],
+        alphAmount: attoToNumber(v[2], ALPH_DECIMALS),
+        xalphAmount: attoToNumber(v[3], ALPH_DECIMALS),
+      }
+    case VAULT_EVENT_UNSTAKE_SCHEDULED:
+      return {
+        ...base,
+        kind: 'unstakeScheduled',
+        address: v[0],
+        xalphAmount: attoToNumber(v[1], ALPH_DECIMALS),
+        alphAmount: attoToNumber(v[2], ALPH_DECIMALS),
+        claimableAt: e.timestamp + UNSTAKE_DURATION_MS,
+      }
+    case VAULT_EVENT_UNSTAKE_CANCELLED:
+      return {
+        ...base,
+        kind: 'unstakeCancelled',
+        address: v[0],
+        xalphAmount: attoToNumber(v[1], ALPH_DECIMALS),
+        // claimed + restaked portions collapsed into one ALPH figure for the feed.
+        alphAmount: attoToNumber(v[2], ALPH_DECIMALS) + attoToNumber(v[3], ALPH_DECIMALS),
+      }
+    case VAULT_EVENT_REWARD_DEPOSITED:
+      return {
+        ...base,
+        kind: 'rewardDeposited',
+        address: v[0],
+        alphAmount: attoToNumber(v[1], ALPH_DECIMALS),
+        xalphAmount: 0,
+      }
+    default:
+      return undefined
+  }
+}
+
+export interface StakingActivityPage {
+  entries: StakingActivityEntry[]
+  /** True if this page was full-sized, i.e. there's likely another page after it. */
+  hasMore: boolean
+}
+
+// Reads one page of the vault's raw event log (newest first) and decodes each
+// entry by its event index. No signer or private API needed: this is public
+// on-chain history. Callers page through it themselves (e.g. on scroll) rather
+// than pulling the whole history up front — the log only grows over time.
+export async function fetchStakingActivityPage(page: number, pageSize = EXPLORER_EVENTS_PAGE_SIZE): Promise<StakingActivityPage> {
+  const explorer = new ExplorerProvider(EXPLORER_API_URL)
+  const events = await explorer.contractEvents.getContractEventsContractAddressContractAddress(XALPH_VAULT_ADDRESS, {
+    limit: pageSize,
+    page,
+  })
+  const entries: StakingActivityEntry[] = []
+  for (const e of events) {
+    const entry = decodeStakingEvent(e)
+    if (entry) entries.push(entry)
+  }
+  return { entries, hasMore: events.length === pageSize }
+}
+
 async function fetchPool(
   nodeProvider: NodeProvider,
   address: string,

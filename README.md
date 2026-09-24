@@ -13,6 +13,9 @@ mainnet in the browser — there is no server or API key.
 - **xALPH × ALPH pool** (`22QumTFozFy6HyndPMna2t4KjjVNGYNATgY2reeV2d6nj`) — TVL and market
   price vs. the vault's redemption rate (peg deviation).
 
+A second page, `activity.html`, lists the vault's most recent stake / unstake / reward
+events, decoded straight from its on-chain event log (no private API involved).
+
 Data sources, all called directly from the client:
 
 | Source | Used for |
