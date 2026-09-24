@@ -161,6 +161,8 @@ export interface StakingActivityEntry {
   xalphAmount: number
   /** For 'unstakeScheduled' entries: when the ALPH becomes claimable (timestamp + unstakeDuration). */
   claimableAt?: number
+  /** For 'unstakeCancelled' entries: the portion that returned to the staked pool (excludes the claimed-out portion). */
+  restakedAlphAmount?: number
 }
 
 // Event indexes match the XAlphToken contract's declaration order (Staked,
@@ -218,6 +220,7 @@ function decodeStakingEvent(e: ChainEvent): StakingActivityEntry | undefined {
         xalphAmount: attoToNumber(v[1], ALPH_DECIMALS),
         // claimed + restaked portions collapsed into one ALPH figure for the feed.
         alphAmount: attoToNumber(v[2], ALPH_DECIMALS) + attoToNumber(v[3], ALPH_DECIMALS),
+        restakedAlphAmount: attoToNumber(v[3], ALPH_DECIMALS),
       }
     case VAULT_EVENT_REWARD_DEPOSITED:
       return {
@@ -232,28 +235,62 @@ function decodeStakingEvent(e: ChainEvent): StakingActivityEntry | undefined {
   }
 }
 
-export interface StakingActivityPage {
-  entries: StakingActivityEntry[]
-  /** True if this page was full-sized, i.e. there's likely another page after it. */
-  hasMore: boolean
+export interface StakePoint {
+  timestamp: number
+  totalStaked: number
 }
 
-// Reads one page of the vault's raw event log (newest first) and decodes each
-// entry by its event index. No signer or private API needed: this is public
-// on-chain history. Callers page through it themselves (e.g. on scroll) rather
-// than pulling the whole history up front — the log only grows over time.
-export async function fetchStakingActivityPage(page: number, pageSize = EXPLORER_EVENTS_PAGE_SIZE): Promise<StakingActivityPage> {
+export interface StakingHistory {
+  /** Newest first — the explorer's natural order, ready for the activity list. */
+  entries: StakingActivityEntry[]
+  /** Oldest first, cumulative — ready for the stake-over-time chart. */
+  timeline: StakePoint[]
+}
+
+// Reads the vault's full raw event log (paged in batches of 100, capped at
+// MAX_ACTIVITY_EVENTS) and decodes it once for both the activity list and the
+// stake-over-time chart — they're the same underlying data, so one fetch serves
+// both rather than the list re-requesting what the chart already pulled down.
+// No signer or private API needed: this is public on-chain history.
+//
+// Also rebuilds the vault's cumulative "ALPH staked" curve: +stake,
+// -unstakeScheduled, +restaked portion of a cancelled unstake, +rewardDeposited.
+// Verified to reproduce the live totalDepositedAlph field exactly once
+// duplicate-indexed rows are collapsed — the explorer occasionally re-indexes the
+// same event under a second, slightly different timestamp (same tx, event index,
+// and field values); deduping on those three is what makes it exact.
+export async function fetchStakingHistory(): Promise<StakingHistory> {
   const explorer = new ExplorerProvider(EXPLORER_API_URL)
-  const events = await explorer.contractEvents.getContractEventsContractAddressContractAddress(XALPH_VAULT_ADDRESS, {
-    limit: pageSize,
-    page,
-  })
-  const entries: StakingActivityEntry[] = []
-  for (const e of events) {
-    const entry = decodeStakingEvent(e)
-    if (entry) entries.push(entry)
+  const seen = new Set<string>()
+  const entries: StakingActivityEntry[] = [] // accumulated newest-first, matching the API's own page order
+
+  for (let page = 1; entries.length < MAX_ACTIVITY_EVENTS; page++) {
+    const events = await explorer.contractEvents.getContractEventsContractAddressContractAddress(XALPH_VAULT_ADDRESS, {
+      limit: EXPLORER_EVENTS_PAGE_SIZE,
+      page,
+    })
+    for (const e of events) {
+      const key = `${e.txHash}|${e.eventIndex}|${JSON.stringify((e.fields ?? []).map((f) => f.value))}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      const entry = decodeStakingEvent(e)
+      if (entry) entries.push(entry)
+    }
+    if (events.length < EXPLORER_EVENTS_PAGE_SIZE) break
   }
-  return { entries, hasMore: events.length === pageSize }
+
+  const oldestFirst = [...entries].sort((a, b) => a.timestamp - b.timestamp)
+  let total = 0
+  const timeline: StakePoint[] = []
+  for (const e of oldestFirst) {
+    if (e.kind === 'stake') total += e.alphAmount
+    else if (e.kind === 'unstakeScheduled') total -= e.alphAmount
+    else if (e.kind === 'unstakeCancelled') total += e.restakedAlphAmount ?? 0
+    else if (e.kind === 'rewardDeposited') total += e.alphAmount
+    timeline.push({ timestamp: e.timestamp, totalStaked: total })
+  }
+
+  return { entries, timeline }
 }
 
 async function fetchPool(

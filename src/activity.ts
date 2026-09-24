@@ -1,23 +1,38 @@
 import './style.css'
-import { fetchStakingActivityPage, MAX_ACTIVITY_EVENTS, EXPLORER_APP_URL, XALPH_VAULT_ADDRESS } from './chain.ts'
-import type { StakingActivityEntry, StakingActivityKind } from './chain.ts'
+import { fetchStakingHistory, MAX_ACTIVITY_EVENTS, EXPLORER_APP_URL, XALPH_VAULT_ADDRESS } from './chain.ts'
+import type { StakingActivityEntry, StakingActivityKind, StakePoint } from './chain.ts'
 import { formatNumber, shortAddress, relativeTime, formatRelativeToNow, formatMonthDay } from './format.ts'
 import { themeToggleButton, bindThemeToggle, logoUrl } from './theme.ts'
+import { stakeChartHtml, bindStakeChart } from './stakeChart.ts'
 
-const PAGE_SIZE = 50
+const REVEAL_BATCH = 50 // how many more rows to render per scroll trigger — a UI reveal, not a network page
 // Hidden for now: distributeRewards() has never fired on-chain (rewardRate is 0), so this
 // kind never actually appears — easy to bring back once rewards start flowing.
 const HIDDEN_KINDS: StakingActivityKind[] = ['rewardDeposited']
 const POWFI_URL = 'https://powfi.alephium.org'
 
+// Sep 14–21 is a handful of one-off seed/whale stakes that dwarf day-to-day
+// activity and flatten the interesting part of the curve — crop the chart to
+// the clearer recent window, carrying the pre-cutoff total forward as the start.
+const CHART_START_MS = Date.parse('2026-09-22T00:00:00Z')
+
+function clampTimelineStart(points: StakePoint[], startAt: number): StakePoint[] {
+  const before = points.filter((p) => p.timestamp < startAt)
+  const after = points.filter((p) => p.timestamp >= startAt)
+  const carried = before.length > 0 ? before[before.length - 1].totalStaked : 0
+  return [{ timestamp: startAt, totalStaked: carried }, ...after]
+}
+
 const app = document.querySelector<HTMLDivElement>('#app')!
 
-let entries: StakingActivityEntry[] = []
-let nextPage = 1
-let hasMore = true
-let isFetching = false // covers both the first load and subsequent page loads; set by loadMore() itself
+// One fetch (fetchStakingHistory) serves both the list and the chart below — no
+// point re-requesting the same event log twice.
+let allEntries: StakingActivityEntry[] = []
+let timeline: StakePoint[] = []
+let loading = true
 let errorMessage: string | null = null
 let activeFilter: StakingActivityKind | 'all' = 'all'
+let visibleCount = REVEAL_BATCH
 let sentinelObserver: IntersectionObserver | null = null
 
 function explorerAddrUrl(addr: string): string {
@@ -89,23 +104,26 @@ function filterBar(): string {
 
 function render(): void {
   const bannerHtml = errorMessage
-    ? `<div class="banner">Live data temporarily unavailable (${errorMessage}). ${entries.length > 0 ? 'Showing what loaded so far.' : ''}</div>`
+    ? `<div class="banner">Live data temporarily unavailable (${errorMessage}). ${allEntries.length > 0 ? 'Showing what loaded before the error.' : ''}</div>`
     : ''
 
-  const filtered = entries.filter((e) => activeFilter === 'all' || e.kind === activeFilter)
+  const filtered = allEntries.filter((e) => activeFilter === 'all' || e.kind === activeFilter)
+  const visible = filtered.slice(0, visibleCount)
+  const hasMoreToShow = visibleCount < filtered.length
+  const chartPoints = loading ? null : clampTimelineStart(timeline, CHART_START_MS)
 
   const listOrEmpty =
-    filtered.length === 0
-      ? isFetching
+    visible.length === 0
+      ? loading
         ? `<p class="skeleton" style="text-align:center">Loading on-chain activity…</p>`
-        : `<p class="skeleton" style="text-align:center">${entries.length === 0 ? 'No staking activity found.' : 'No events match this filter.'}</p>`
-      : `<div class="activity-list">${filtered.map(activityRow).join('')}</div>`
+        : `<p class="skeleton" style="text-align:center">${allEntries.length === 0 ? 'No staking activity found.' : 'No events match this filter.'}</p>`
+      : `<div class="activity-list">${visible.map(activityRow).join('')}</div>`
 
-  const footerLine = !hasMore
-    ? entries.length > 0
+  const footerLine = !hasMoreToShow
+    ? visible.length > 0
       ? `<p class="activity-end">That's the full history.</p>`
       : ''
-    : `<div id="load-more-sentinel" class="activity-sentinel">${isFetching ? 'Loading more…' : ''}</div>`
+    : `<div id="load-more-sentinel" class="activity-sentinel"></div>`
 
   app.innerHTML = `
     <div class="page">
@@ -121,9 +139,9 @@ function render(): void {
       <div class="hero">
         <span class="pill">Live · Alephium mainnet</span>
         <h1>xALPH staking <span class="accent">activity</span>.</h1>
-        <p>Stake and unstake events read straight from the
+        <p>Every stake, unstake, and cancellation event read straight from the
           <a class="addr-link" href="${explorerAddrUrl(XALPH_VAULT_ADDRESS)}" target="_blank" rel="noopener">xALPH vault's</a>
-          on-chain event log — no private API involved. Scroll to load more (up to ${formatNumber(MAX_ACTIVITY_EVENTS, 0)}).
+          on-chain event log (up to ${formatNumber(MAX_ACTIVITY_EVENTS, 0)}) — no private API involved, loaded once and revealed as you scroll.
           Unstakes show when the ALPH becomes claimable, 30 days after the request.</p>
       </div>
 
@@ -131,8 +149,16 @@ function render(): void {
 
       <section class="block">
         <div class="block-head">
-          <h2>Recent activity${entries.length > 0 ? ` <span class="block-head-count">(${formatNumber(entries.length, 0)} loaded)</span>` : ''}.</h2>
-          <button class="refresh-btn" id="refresh-btn" ${isFetching ? 'disabled' : ''}>${isFetching ? 'Loading…' : 'Refresh'}</button>
+          <h2>Total ALPH staked over time.</h2>
+        </div>
+        ${stakeChartHtml(chartPoints, loading, errorMessage)}
+        <p class="note" style="margin-top:14px">Reconstructed from the same events as the list below, since ${formatMonthDay(CHART_START_MS)} — not a smoothed estimate. Earlier one-off seed stakes are folded into the starting value.</p>
+      </section>
+
+      <section class="block">
+        <div class="block-head">
+          <h2>Recent activity${allEntries.length > 0 ? ` <span class="block-head-count">(${formatNumber(allEntries.length, 0)} loaded)</span>` : ''}.</h2>
+          <button class="refresh-btn" id="refresh-btn" ${loading ? 'disabled' : ''}>${loading ? 'Loading…' : 'Refresh'}</button>
         </div>
         ${filterBar()}
         ${listOrEmpty}
@@ -146,16 +172,17 @@ function render(): void {
     </div>
   `
 
-  document.getElementById('refresh-btn')?.addEventListener('click', () => void reload())
+  document.getElementById('refresh-btn')?.addEventListener('click', () => void load())
   document.querySelectorAll<HTMLButtonElement>('.filter-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       activeFilter = btn.dataset.filter as StakingActivityKind | 'all'
+      visibleCount = REVEAL_BATCH
       render()
-      bindSentinel()
     })
   })
   bindThemeToggle(render)
   bindSentinel()
+  bindStakeChart(chartPoints)
 }
 
 function bindSentinel(): void {
@@ -163,36 +190,29 @@ function bindSentinel(): void {
   const sentinel = document.getElementById('load-more-sentinel')
   if (!sentinel) return
   sentinelObserver = new IntersectionObserver((observed) => {
-    if (observed[0]?.isIntersecting) void loadMore()
+    if (observed[0]?.isIntersecting) {
+      visibleCount += REVEAL_BATCH
+      render()
+    }
   })
   sentinelObserver.observe(sentinel)
 }
 
-async function loadMore(): Promise<void> {
-  if (isFetching || !hasMore || entries.length >= MAX_ACTIVITY_EVENTS) return
-  isFetching = true
+async function load(): Promise<void> {
+  loading = true
   render()
   try {
-    const page = await fetchStakingActivityPage(nextPage, PAGE_SIZE)
-    const visible = page.entries.filter((e) => !HIDDEN_KINDS.includes(e.kind))
-    entries = entries.concat(visible)
-    nextPage += 1
-    hasMore = page.hasMore && entries.length < MAX_ACTIVITY_EVENTS
+    const history = await fetchStakingHistory()
+    allEntries = history.entries.filter((e) => !HIDDEN_KINDS.includes(e.kind))
+    timeline = history.timeline
     errorMessage = null
   } catch (err) {
     errorMessage = err instanceof Error ? err.message : 'unknown error'
-    hasMore = false // stop auto-retrying; the Refresh button starts over
   } finally {
-    isFetching = false
+    loading = false
+    visibleCount = REVEAL_BATCH
     render()
   }
 }
 
-async function reload(): Promise<void> {
-  entries = []
-  nextPage = 1
-  hasMore = true
-  await loadMore()
-}
-
-void loadMore()
+void load()
