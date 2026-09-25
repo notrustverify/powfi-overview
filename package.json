@@ -13,6 +13,7 @@
     "vite": "^8.3.0"
   },
   "dependencies": {
+    "@alephium/powfi-sdk": "^1.0.0",
     "@alephium/web3": "^3.0.4"
   }
 }

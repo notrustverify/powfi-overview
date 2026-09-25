@@ -1,6 +1,9 @@
 import './style.css'
 import {
   fetchDashboardData,
+  fetchAddressXalphBalance,
+  isAlephiumAddress,
+  xalphMarketRate,
   TARGETS,
   XALPH_VAULT_ADDRESS,
   POOL_ALPH_USDT_ADDRESS,
@@ -8,7 +11,20 @@ import {
   EXPLORER_APP_URL,
 } from './chain.ts'
 import type { DashboardData, PoolData } from './chain.ts'
-import { formatCompact, formatUsd, formatNumber, formatPercent, formatCountdown, clampPct, shortAddress, relativeTime } from './format.ts'
+// Loaded via dynamic import() in checkUnstake() — pulls in @alephium/powfi-sdk
+// (~200KB gzipped), so it only loads when the calculator is actually used.
+import type { PendingUnstake, LpPosition } from './xalphPositions.ts'
+import {
+  formatCompact,
+  formatUsd,
+  formatNumber,
+  formatPercent,
+  formatCountdown,
+  clampPct,
+  shortAddress,
+  relativeTime,
+  escapeHtml,
+} from './format.ts'
 import { themeToggleButton, bindThemeToggle, logoUrl } from './theme.ts'
 
 const REFRESH_INTERVAL_MS = 120_000
@@ -21,6 +37,22 @@ let data: DashboardData | null = null
 let errorMessage: string | null = null
 let loading = true
 let advancedOpen = false
+
+interface UnstakeResult {
+  address: string
+  xalphBalance: number
+  lpPositions: LpPosition[]
+  pendingUnstakes: PendingUnstake[]
+  alphAtRedemption: number
+  alphAtMarket: number
+  deviationPct: number
+  stakingYieldAlph: number
+}
+
+let unstakeAddress = ''
+let unstakeLoading = false
+let unstakeError: string | null = null
+let unstakeResult: UnstakeResult | null = null
 
 function progressCard(current: string, currentRaw: number, target: number, targetLabel: string, label: string, full = false): string {
   const pct = target > 0 ? (currentRaw / target) * 100 : 0
@@ -60,6 +92,64 @@ function explorerAddrUrl(addr: string): string {
   return `${EXPLORER_APP_URL}/addresses/${addr}`
 }
 
+function unstakeResultHtml(r: UnstakeResult): string {
+  const flat = Math.abs(r.deviationPct) < 0.01
+  const marketIsBetter = r.deviationPct > 0
+  const lpXalph = r.lpPositions.reduce((s, p) => s + p.xalphAmount, 0)
+  const pendingAlph = r.pendingUnstakes.reduce((s, p) => s + p.totalUnstakeAmount, 0)
+  const pendingClaimableNow = r.pendingUnstakes.reduce((s, p) => s + p.claimableNow, 0)
+
+  return `
+    <div class="unstake-result">
+      <div class="reserve-row"><span class="sym">xALPH held (idle)</span><a class="amt addr-link" href="${explorerAddrUrl(r.address)}" target="_blank" rel="noopener">${formatNumber(r.xalphBalance, 6)}</a></div>
+      ${
+        r.lpPositions.length > 0
+          ? `<div class="reserve-row"><span class="sym">xALPH in LP (${r.lpPositions.length} position${r.lpPositions.length === 1 ? '' : 's'})</span><span class="amt">${formatNumber(lpXalph, 6)}</span></div>`
+          : ''
+      }
+      ${
+        r.pendingUnstakes.length > 0
+          ? `<div class="reserve-row"><span class="sym">Pending unstake (${r.pendingUnstakes.length} request${r.pendingUnstakes.length === 1 ? '' : 's'})</span><span class="amt">${formatNumber(pendingAlph, 6)} ALPH <small class="activity-claim-date">(${formatNumber(pendingClaimableNow, 4)} claimable now)</small></span></div>`
+          : ''
+      }
+      <div class="reserve-row"><span class="sym">Staking yield earned so far</span><span class="amt" style="color:${r.stakingYieldAlph > 0 ? 'var(--good)' : 'inherit'}">+${formatNumber(r.stakingYieldAlph, 6)} ALPH</span></div>
+      <div class="reserve-row"><span class="sym">Unstake + claim everything (vault rate)</span><span class="amt">${formatNumber(r.alphAtRedemption, 6)} ALPH</span></div>
+      <div class="reserve-row"><span class="sym">Swap the xALPH instead (market price)</span><span class="amt">${formatNumber(r.alphAtMarket, 6)} ALPH</span></div>
+      <div class="reserve-row"><span class="sym">Market vs. redemption</span><span class="amt" style="color:${flat ? 'inherit' : marketIsBetter ? 'var(--good)' : 'var(--warn)'}">${r.deviationPct >= 0 ? '+' : ''}${formatNumber(r.deviationPct, 3)}%</span></div>
+      <p class="adv-caveat">Totals include the xALPH side of any liquidity provided to the xALPH × ALPH pool (valued at the current pool price and tick range — the ALPH side of those positions isn't counted here) and any pending unstake requests already in the 30-day cooldown. Both would need to be withdrawn/claimed separately first.</p>
+    </div>
+  `
+}
+
+function unstakeSection(): string {
+  const body = unstakeResult
+    ? unstakeResultHtml(unstakeResult)
+    : `<p class="note" style="margin:0">Enter an address holding xALPH to compare unstaking (vault redemption rate) against swapping on the xALPH × ALPH pool (market price).</p>`
+  return `
+    <section class="block">
+      <div class="block-head">
+        <h2>Unstake calculator.</h2>
+      </div>
+      <div class="card unstake-card">
+        <form id="unstake-form" class="unstake-form">
+          <input
+            id="unstake-address"
+            class="addr-input"
+            type="text"
+            placeholder="Alephium address holding xALPH"
+            value="${escapeHtml(unstakeAddress)}"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button type="submit" class="refresh-btn" ${unstakeLoading ? 'disabled' : ''}>${unstakeLoading ? 'Checking…' : 'Check'}</button>
+        </form>
+        ${unstakeError ? `<p class="unstake-error">${escapeHtml(unstakeError)}</p>` : ''}
+        ${body}
+      </div>
+    </section>
+  `
+}
+
 function stakedTweetUrl(alphStaked: number, circulatingPct: number): string {
   const text = `${formatCompact(alphStaked)} $ALPH is now staked in @alephium's PowFi, ${formatPercent(circulatingPct, 2)} of circulating ALPH supply.`
   return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`
@@ -86,8 +176,7 @@ function render(): void {
   const poolUsdtTvl = d.poolAlphUsdt.price.tvlUsd
   const poolXalphTvl = d.poolXalphAlph.price.tvlUsd
 
-  // pool2's token0/token1 is ALPH/xALPH, so price1Per0 is xALPH per ALPH — invert for ALPH per xALPH.
-  const xalphSpotRate = 1 / d.poolXalphAlph.price.price1Per0
+  const xalphSpotRate = xalphMarketRate(d)
   const xalphPegDeviationPct = ((xalphSpotRate - d.vault.redemptionRate) / d.vault.redemptionRate) * 100
 
   app.innerHTML = `
@@ -116,6 +205,8 @@ function render(): void {
         </div>
         <p class="note">*While TVL sits below target, early LPs can earn substantially higher APYs.</p>
       </section>
+
+      ${unstakeSection()}
 
       <details class="advanced" ${advancedOpen ? 'open' : ''}>
         <summary>Advanced recap<span class="chevron">▾</span></summary>
@@ -181,6 +272,11 @@ function render(): void {
   document.querySelector('.advanced')?.addEventListener('toggle', (e) => {
     advancedOpen = (e.target as HTMLDetailsElement).open
   })
+  document.getElementById('unstake-form')?.addEventListener('submit', (e) => {
+    e.preventDefault()
+    const input = document.getElementById('unstake-address') as HTMLInputElement | null
+    void checkUnstake(input?.value ?? '')
+  })
   bindThemeToggle(render)
   tick()
 }
@@ -213,6 +309,63 @@ function header(): string {
       <div class="live-indicator"><span class="live-dot"></span>Auto-refresh <span id="next-refresh">in ${formatCountdown(REFRESH_INTERVAL_MS / 1000)}</span></div>
     </div>
   `
+}
+
+async function checkUnstake(rawAddress: string): Promise<void> {
+  const address = rawAddress.trim()
+  unstakeAddress = address
+  unstakeResult = null
+  unstakeError = null
+
+  if (!address) {
+    unstakeError = 'Enter an Alephium address.'
+    render()
+    return
+  }
+  if (!isAlephiumAddress(address)) {
+    unstakeError = 'That does not look like a valid Alephium address.'
+    render()
+    return
+  }
+  if (!data) {
+    unstakeError = 'Live data not loaded yet — try again in a moment.'
+    render()
+    return
+  }
+
+  unstakeLoading = true
+  render()
+  try {
+    const { fetchPendingUnstakes, fetchXalphLpPositions } = await import('./xalphPositions.ts')
+    const [balanceResult, pendingResult, lpResult] = await Promise.allSettled([
+      fetchAddressXalphBalance(address),
+      fetchPendingUnstakes(address),
+      fetchXalphLpPositions(address),
+    ])
+    if (balanceResult.status === 'rejected') throw balanceResult.reason
+
+    const xalphBalance = balanceResult.value
+    const pendingUnstakes = pendingResult.status === 'fulfilled' ? pendingResult.value : []
+    const lpPositions = lpResult.status === 'fulfilled' ? lpResult.value : []
+
+    const lpXalph = lpPositions.reduce((s, p) => s + p.xalphAmount, 0)
+    const pendingAlph = pendingUnstakes.reduce((s, p) => s + p.totalUnstakeAmount, 0)
+    const totalXalph = xalphBalance + lpXalph
+
+    const alphAtRedemption = totalXalph * data.vault.redemptionRate + pendingAlph
+    const alphAtMarket = totalXalph * xalphMarketRate(data) + pendingAlph
+    const deviationPct = totalXalph > 0 ? ((xalphMarketRate(data) - data.vault.redemptionRate) / data.vault.redemptionRate) * 100 : 0
+    // Every xALPH has ever been minted at 1:1 (redemption rate started at exactly 1.0 and only
+    // rises) — so this is real accrued yield, not an estimate, for the convertible xALPH balance.
+    const stakingYieldAlph = totalXalph * (data.vault.redemptionRate - 1)
+
+    unstakeResult = { address, xalphBalance, lpPositions, pendingUnstakes, alphAtRedemption, alphAtMarket, deviationPct, stakingYieldAlph }
+  } catch (err) {
+    unstakeError = err instanceof Error ? err.message : 'Failed to fetch xALPH balance for this address.'
+  } finally {
+    unstakeLoading = false
+    render()
+  }
 }
 
 async function load(): Promise<void> {

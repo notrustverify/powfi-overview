@@ -1,4 +1,4 @@
-import { NodeProvider, ExplorerProvider, tokenIdFromAddress, contractIdFromAddress, binToHex } from '@alephium/web3'
+import { NodeProvider, ExplorerProvider, tokenIdFromAddress, contractIdFromAddress, binToHex, isValidAddress } from '@alephium/web3'
 
 export const NODE_URL = 'https://node.mainnet.alephium.org'
 export const EXPLORER_API_URL = 'https://backend.mainnet.alephium.org'
@@ -305,6 +305,23 @@ async function fetchPool(
     return { meta, amount: attoToNumber(t.amount, meta.decimals) }
   })
   return { address, alphReserve, tokenReserves }
+}
+
+export function isAlephiumAddress(address: string): boolean {
+  return isValidAddress(address)
+}
+
+/** Live spot rate of 1 xALPH in ALPH, read from the xALPH/ALPH pool's current tick. */
+export function xalphMarketRate(d: Pick<DashboardData, 'poolXalphAlph'>): number {
+  return 1 / d.poolXalphAlph.price.price1Per0
+}
+
+// Reads the address's exact xALPH balance from the explorer — same source the
+// wallet balance view uses, so it reflects real holdings including any dust.
+export async function fetchAddressXalphBalance(address: string): Promise<number> {
+  const explorer = new ExplorerProvider(EXPLORER_API_URL)
+  const result = await explorer.addresses.getAddressesAddressTokensTokenIdBalance(address, XALPH_TOKEN_ID)
+  return attoToNumber(result.balance, ALPH_DECIMALS)
 }
 
 export async function fetchDashboardData(): Promise<DashboardData> {

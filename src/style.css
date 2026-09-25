@@ -393,6 +393,71 @@ details.advanced summary:hover .chevron {
   color: var(--accent);
 }
 
+.unstake-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.unstake-form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.addr-input {
+  flex: 1 1 320px;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--surface-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink);
+}
+
+.addr-input:focus {
+  outline: none;
+  border-color: var(--accent-border);
+}
+
+.addr-input::placeholder {
+  color: var(--ink-faint);
+  font-family: var(--font);
+}
+
+.unstake-form .refresh-btn {
+  flex: 0 0 auto;
+  padding: 10px 20px;
+}
+
+.unstake-error {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--warn);
+}
+
+.unstake-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--surface-border);
+}
+
+.unstake-result .addr-link {
+  text-decoration: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.unstake-result .addr-link:hover {
+  color: var(--accent);
+}
+
 footer {
   margin-top: 56px;
   padding-top: 20px;
