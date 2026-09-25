@@ -13,10 +13,6 @@ export const XALPH_TOKEN_ID = binToHex(tokenIdFromAddress(XALPH_VAULT_ADDRESS))
 const POOL_ALPH_USDT_ID = binToHex(contractIdFromAddress(POOL_ALPH_USDT_ADDRESS))
 const POOL_XALPH_ALPH_ID = binToHex(contractIdFromAddress(POOL_XALPH_ALPH_ADDRESS))
 
-// xALPH vault contract methods (verified against DefiLlama's production PowFi adapter).
-const VAULT_METHOD_GET_XALPH_SUPPLY = 3
-const VAULT_METHOD_GET_XALPH_BACKING = 13
-
 // Campaign targets, as published for Round 0.
 export const TARGETS = {
   stakedAlph: 20_500_000,
@@ -80,28 +76,15 @@ async function fetchAlphPriceUsd(): Promise<number> {
   return price
 }
 
-// Reads the vault's own supply/backing getters rather than guessing at raw
-// contract field layout — same methods DefiLlama's production PowFi adapter uses.
+// Reads the vault's mutable state directly — one call instead of two separate
+// method calls. Field order verified against the live contract: mutFields is
+// [totalDepositedAlph, totalXAlphSupply, lastUnstakeVaultIndex].
 async function fetchVaultStats(
   nodeProvider: NodeProvider,
 ): Promise<{ alphStaked: number; xalphIssued: number; redemptionRate: number }> {
-  const [supplyResult, backingResult] = await Promise.all([
-    nodeProvider.contracts.postContractsCallContract({
-      group: 0,
-      address: XALPH_VAULT_ADDRESS,
-      methodIndex: VAULT_METHOD_GET_XALPH_SUPPLY,
-    }),
-    nodeProvider.contracts.postContractsCallContract({
-      group: 0,
-      address: XALPH_VAULT_ADDRESS,
-      methodIndex: VAULT_METHOD_GET_XALPH_BACKING,
-    }),
-  ])
-  if (!('returns' in supplyResult) || !('returns' in backingResult)) {
-    throw new Error('xALPH vault contract call failed')
-  }
-  const xalphIssued = attoToNumber(supplyResult.returns[0].value as string, ALPH_DECIMALS)
-  const alphStaked = attoToNumber(backingResult.returns[0].value as string, ALPH_DECIMALS)
+  const state = await nodeProvider.contracts.getContractsAddressState(XALPH_VAULT_ADDRESS)
+  const alphStaked = attoToNumber(state.mutFields[0].value as string, ALPH_DECIMALS)
+  const xalphIssued = attoToNumber(state.mutFields[1].value as string, ALPH_DECIMALS)
   return { alphStaked, xalphIssued, redemptionRate: xalphIssued > 0 ? alphStaked / xalphIssued : 1 }
 }
 
