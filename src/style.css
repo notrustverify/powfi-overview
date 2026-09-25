@@ -405,13 +405,18 @@ details.advanced summary:hover .chevron {
   flex-wrap: wrap;
 }
 
-.addr-input {
+.addr-input-wrap {
+  position: relative;
   flex: 1 1 320px;
   min-width: 0;
+}
+
+.addr-input {
+  width: 100%;
   background: var(--bg);
   border: 1px solid var(--surface-border);
   border-radius: 10px;
-  padding: 10px 14px;
+  padding: 10px 36px 10px 14px;
   font-size: 14px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--ink);
@@ -425,6 +430,31 @@ details.advanced summary:hover .chevron {
 .addr-input::placeholder {
   color: var(--ink-faint);
   font-family: var(--font);
+}
+
+.addr-input-clear {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  color: var(--ink-faint);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.addr-input-clear:hover,
+.addr-input-clear:active {
+  background: rgba(var(--ink-rgb), 0.08);
+  color: var(--accent);
 }
 
 .unstake-form .refresh-btn {

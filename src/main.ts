@@ -1,3 +1,4 @@
+import { ALPH_TOKEN_ID } from '@alephium/web3'
 import './style.css'
 import {
   fetchDashboardData,
@@ -6,6 +7,7 @@ import {
   xalphMarketRate,
   TARGETS,
   XALPH_VAULT_ADDRESS,
+  XALPH_TOKEN_ID,
   POOL_ALPH_USDT_ADDRESS,
   POOL_XALPH_ALPH_ADDRESS,
   EXPLORER_APP_URL,
@@ -30,6 +32,8 @@ import { themeToggleButton, bindThemeToggle, logoUrl } from './theme.ts'
 const REFRESH_INTERVAL_MS = 120_000
 const POWFI_URL = 'https://powfi.alephium.org'
 const POWFI_FAQ_URL = 'https://docs.alephium.org/powfi/faq'
+// xALPH -> ALPH swap, prefilled — for "check the real quote yourself" in the unstake calculator.
+const POWFI_XALPH_TO_ALPH_SWAP_URL = `https://powfi.alephium.org/swap/?inputMint=${XALPH_TOKEN_ID}&outputMint=${ALPH_TOKEN_ID}`
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 
@@ -49,7 +53,31 @@ interface UnstakeResult {
   stakingYieldAlph: number
 }
 
-let unstakeAddress = ''
+const RECENT_ADDRESSES_STORAGE_KEY = 'powfi-recent-unstake-addresses'
+const MAX_RECENT_ADDRESSES = 3
+
+function loadRecentAddresses(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_ADDRESSES_STORAGE_KEY)
+    const parsed: unknown = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed.filter((a): a is string => typeof a === 'string').slice(0, MAX_RECENT_ADDRESSES) : []
+  } catch {
+    return [] // localStorage unavailable (private mode etc.) or corrupt data
+  }
+}
+
+function saveRecentAddress(address: string): void {
+  try {
+    const next = [address, ...recentAddresses.filter((a) => a !== address)].slice(0, MAX_RECENT_ADDRESSES)
+    recentAddresses = next
+    localStorage.setItem(RECENT_ADDRESSES_STORAGE_KEY, JSON.stringify(next))
+  } catch {
+    // localStorage unavailable — recent addresses just won't be remembered.
+  }
+}
+
+let recentAddresses = loadRecentAddresses()
+let unstakeAddress = recentAddresses[0] ?? ''
 let unstakeLoading = false
 let unstakeError: string | null = null
 let unstakeResult: UnstakeResult | null = null
@@ -114,9 +142,10 @@ function unstakeResultHtml(r: UnstakeResult): string {
       }
       <div class="reserve-row"><span class="sym">Staking yield earned so far</span><span class="amt" style="color:${r.stakingYieldAlph > 0 ? 'var(--good)' : 'inherit'}">+${formatNumber(r.stakingYieldAlph, 6)} ALPH</span></div>
       <div class="reserve-row"><span class="sym">Unstake + claim everything (vault rate)</span><span class="amt">${formatNumber(r.alphAtRedemption, 6)} ALPH</span></div>
-      <div class="reserve-row"><span class="sym">Swap the xALPH instead (market price)</span><span class="amt">${formatNumber(r.alphAtMarket, 6)} ALPH</span></div>
+      <div class="reserve-row"><span class="sym">Swap the xALPH instead (pool quote, fees + slippage incl.)</span><span class="amt">${formatNumber(r.alphAtMarket, 6)} ALPH</span></div>
       <div class="reserve-row"><span class="sym">Market vs. redemption</span><span class="amt" style="color:${flat ? 'inherit' : marketIsBetter ? 'var(--good)' : 'var(--warn)'}">${r.deviationPct >= 0 ? '+' : ''}${formatNumber(r.deviationPct, 3)}%</span></div>
       <p class="adv-caveat">Totals include the xALPH side of any liquidity provided to the xALPH × ALPH pool (valued at the current pool price and tick range — the ALPH side of those positions isn't counted here) and any pending unstake requests already in the 30-day cooldown. Both would need to be withdrawn/claimed separately first.</p>
+      <p class="adv-caveat">The swap figure is a simulated quote for indication only — it can shift before you actually trade. Get the real, live quote at <a href="${POWFI_XALPH_TO_ALPH_SWAP_URL}" target="_blank" rel="noopener">powfi.alephium.org/swap</a>.</p>
     </div>
   `
 }
@@ -132,17 +161,32 @@ function unstakeSection(): string {
       </div>
       <div class="card unstake-card">
         <form id="unstake-form" class="unstake-form">
-          <input
-            id="unstake-address"
-            class="addr-input"
-            type="text"
-            placeholder="Alephium address holding xALPH"
-            value="${escapeHtml(unstakeAddress)}"
-            autocomplete="off"
-            spellcheck="false"
-          />
+          <div class="addr-input-wrap">
+            <input
+              id="unstake-address"
+              class="addr-input"
+              type="text"
+              placeholder="Alephium address holding xALPH"
+              value="${escapeHtml(unstakeAddress)}"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button type="button" class="addr-input-clear" id="unstake-address-clear" aria-label="Clear address" title="Clear">✕</button>
+          </div>
           <button type="submit" class="refresh-btn" ${unstakeLoading ? 'disabled' : ''}>${unstakeLoading ? 'Checking…' : 'Check'}</button>
         </form>
+        ${
+          recentAddresses.length > 0
+            ? `<div class="filter-bar">
+                ${recentAddresses
+                  .map(
+                    (a) =>
+                      `<button type="button" class="filter-btn recent-addr-btn" data-address="${escapeHtml(a)}" title="${escapeHtml(a)}">${shortAddress(a)}</button>`,
+                  )
+                  .join('')}
+              </div>`
+            : ''
+        }
         ${unstakeError ? `<p class="unstake-error">${escapeHtml(unstakeError)}</p>` : ''}
         ${body}
       </div>
@@ -277,6 +321,16 @@ function render(): void {
     const input = document.getElementById('unstake-address') as HTMLInputElement | null
     void checkUnstake(input?.value ?? '')
   })
+  document.querySelectorAll<HTMLButtonElement>('.recent-addr-btn').forEach((btn) => {
+    btn.addEventListener('click', () => void checkUnstake(btn.dataset.address ?? ''))
+  })
+  document.getElementById('unstake-address-clear')?.addEventListener('click', () => {
+    const input = document.getElementById('unstake-address') as HTMLInputElement | null
+    if (input) {
+      input.value = ''
+      input.focus()
+    }
+  })
   bindThemeToggle(render)
   tick()
 }
@@ -327,6 +381,7 @@ async function checkUnstake(rawAddress: string): Promise<void> {
     render()
     return
   }
+  saveRecentAddress(address)
   if (!data) {
     unstakeError = 'Live data not loaded yet — try again in a moment.'
     render()
@@ -336,7 +391,7 @@ async function checkUnstake(rawAddress: string): Promise<void> {
   unstakeLoading = true
   render()
   try {
-    const { fetchPendingUnstakes, fetchXalphLpPositions } = await import('./xalphPositions.ts')
+    const { fetchPendingUnstakes, fetchXalphLpPositions, fetchXalphToAlphSwapQuote } = await import('./xalphPositions.ts')
     const [balanceResult, pendingResult, lpResult] = await Promise.allSettled([
       fetchAddressXalphBalance(address),
       fetchPendingUnstakes(address),
@@ -352,14 +407,37 @@ async function checkUnstake(rawAddress: string): Promise<void> {
     const pendingAlph = pendingUnstakes.reduce((s, p) => s + p.totalUnstakeAmount, 0)
     const totalXalph = xalphBalance + lpXalph
 
-    const alphAtRedemption = totalXalph * data.vault.redemptionRate + pendingAlph
-    const alphAtMarket = totalXalph * xalphMarketRate(data) + pendingAlph
-    const deviationPct = totalXalph > 0 ? ((xalphMarketRate(data) - data.vault.redemptionRate) / data.vault.redemptionRate) * 100 : 0
+    // Real swap quote (fee + price impact included) rather than amount × spot price;
+    // falls back to the spot-price estimate if the simulation fails for any reason.
+    let swapQuote: Awaited<ReturnType<typeof fetchXalphToAlphSwapQuote>> = null
+    try {
+      swapQuote = await fetchXalphToAlphSwapQuote(totalXalph)
+    } catch {
+      swapQuote = null
+    }
+
+    // Scoped to just the xALPH-conversion methods (excludes the common +pendingAlph term,
+    // which is identical either way and would otherwise dilute the comparison).
+    const xalphAtRedemption = totalXalph * data.vault.redemptionRate
+    const xalphAtMarket = swapQuote?.alphOut ?? totalXalph * xalphMarketRate(data)
+    const deviationPct = xalphAtRedemption > 0 ? ((xalphAtMarket - xalphAtRedemption) / xalphAtRedemption) * 100 : 0
+
+    const alphAtRedemption = xalphAtRedemption + pendingAlph
+    const alphAtMarket = xalphAtMarket + pendingAlph
     // Every xALPH has ever been minted at 1:1 (redemption rate started at exactly 1.0 and only
     // rises) — so this is real accrued yield, not an estimate, for the convertible xALPH balance.
     const stakingYieldAlph = totalXalph * (data.vault.redemptionRate - 1)
 
-    unstakeResult = { address, xalphBalance, lpPositions, pendingUnstakes, alphAtRedemption, alphAtMarket, deviationPct, stakingYieldAlph }
+    unstakeResult = {
+      address,
+      xalphBalance,
+      lpPositions,
+      pendingUnstakes,
+      alphAtRedemption,
+      alphAtMarket,
+      deviationPct,
+      stakingYieldAlph,
+    }
   } catch (err) {
     unstakeError = err instanceof Error ? err.message : 'Failed to fetch xALPH balance for this address.'
   } finally {
