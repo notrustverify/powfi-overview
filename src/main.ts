@@ -155,9 +155,9 @@ function unstakeSection(): string {
     ? unstakeResultHtml(unstakeResult)
     : `<p class="note" style="margin:0">Enter an address holding xALPH to compare unstaking (vault redemption rate) against swapping on the xALPH × ALPH pool (market price).</p>`
   return `
-    <section class="block">
+    <section class="block" id="calculator">
       <div class="block-head">
-        <h2>Unstake calculator.</h2>
+        <h2>Unstake calculator. <a class="anchor-link" href="#calculator" aria-label="Link to this section" title="Link to this section">#</a></h2>
       </div>
       <div class="card unstake-card">
         <form id="unstake-form" class="unstake-form">
@@ -332,7 +332,21 @@ function render(): void {
     }
   })
   bindThemeToggle(render)
+  scrollToHashOnce()
   tick()
+}
+
+// The calculator section only exists once live data has loaded, so a plain
+// #calculator link can arrive before the browser's own anchor-scroll
+// has anything to land on. Do it ourselves, once, the first time the target
+// element actually appears in the DOM.
+let scrolledToHash = false
+function scrollToHashOnce(): void {
+  if (scrolledToHash || !window.location.hash) return
+  const target = document.getElementById(window.location.hash.slice(1))
+  if (!target) return
+  target.scrollIntoView({ block: 'start' })
+  scrolledToHash = true
 }
 
 function tick(): void {
