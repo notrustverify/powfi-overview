@@ -194,8 +194,9 @@ function unstakeSection(): string {
   `
 }
 
-function stakedTweetUrl(alphStaked: number, circulatingPct: number): string {
-  const text = `${formatCompact(alphStaked)} $ALPH is now staked in @alephium's PowFi, ${formatPercent(circulatingPct, 2)} of circulating ALPH supply.`
+function stakedTweetUrl(alphStaked: number, circulatingPct: number, alphPriceUsdt: number): string {
+  const usdtValue = formatCompact(alphStaked * alphPriceUsdt)
+  const text = `${formatCompact(alphStaked)} $ALPH (~${usdtValue} $USDT) is now staked in @alephium's PowFi, ${formatPercent(circulatingPct, 2)} of circulating ALPH supply.`
   return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`
 }
 
@@ -231,7 +232,7 @@ function render(): void {
       <section class="block">
         <div class="block-head">
           <h2>Campaign targets: overview.</h2>
-          <a class="share-btn" href="${stakedTweetUrl(d.vault.alphStaked, stakedPct)}" target="_blank" rel="noopener">Share on 𝕏</a>
+          <a class="share-btn" href="${stakedTweetUrl(d.vault.alphStaked, stakedPct, d.poolAlphUsdt.price.price1Per0)}" target="_blank" rel="noopener">Share on 𝕏</a>
         </div>
         <div class="grid">
           ${progressCard(`${formatCompact(d.vault.alphStaked)} ALPH`, d.vault.alphStaked, TARGETS.stakedAlph, `${formatCompact(TARGETS.stakedAlph)} ALPH`, 'ALPH staked')}
