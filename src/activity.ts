@@ -1,9 +1,8 @@
 import './style.css'
 import { fetchStakingHistory, MAX_ACTIVITY_EVENTS, EXPLORER_APP_URL, XALPH_VAULT_ADDRESS } from './chain.ts'
-import type { StakingActivityEntry, StakingActivityKind, StakePoint } from './chain.ts'
+import type { StakingActivityEntry, StakingActivityKind } from './chain.ts'
 import { formatNumber, shortAddress, relativeTime, formatRelativeToNow, formatMonthDay } from './format.ts'
-import { themeToggleButton, bindThemeToggle, logoUrl } from './theme.ts'
-import { stakeChartHtml, bindStakeChart } from './stakeChart.ts'
+import { themeToggleButton, bindThemeToggle, logoUrl, getTheme } from './theme.ts'
 
 const REVEAL_BATCH = 50 // how many more rows to render per scroll trigger — a UI reveal, not a network page
 // Hidden for now: distributeRewards() has never fired on-chain (rewardRate is 0), so this
@@ -11,24 +10,16 @@ const REVEAL_BATCH = 50 // how many more rows to render per scroll trigger — a
 const HIDDEN_KINDS: StakingActivityKind[] = ['rewardDeposited']
 const POWFI_URL = 'https://powfi.alephium.org'
 
-// Sep 14–21 is a handful of one-off seed/whale stakes that dwarf day-to-day
-// activity and flatten the interesting part of the curve — crop the chart to
-// the clearer recent window, carrying the pre-cutoff total forward as the start.
-const CHART_START_MS = Date.parse('2026-09-22T00:00:00Z')
+const DEFILLAMA_XALPH_CHART_BASE_URL =
+  'https://defillama.com/chart/protocol/xalph?usdInflows=false&include_staking_in_tvl=true&include_borrowed_in_tvl=true&include_doublecounted_in_tvl=true&include_liquidstaking_in_tvl=true'
 
-function clampTimelineStart(points: StakePoint[], startAt: number): StakePoint[] {
-  const before = points.filter((p) => p.timestamp < startAt)
-  const after = points.filter((p) => p.timestamp >= startAt)
-  const carried = before.length > 0 ? before[before.length - 1].totalStaked : 0
-  return [{ timestamp: startAt, totalStaked: carried }, ...after]
+function defillamaChartUrl(): string {
+  return `${DEFILLAMA_XALPH_CHART_BASE_URL}&theme=${getTheme()}`
 }
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 
-// One fetch (fetchStakingHistory) serves both the list and the chart below — no
-// point re-requesting the same event log twice.
 let allEntries: StakingActivityEntry[] = []
-let timeline: StakePoint[] = []
 let loading = true
 let errorMessage: string | null = null
 let activeFilter: StakingActivityKind | 'all' = 'all'
@@ -110,7 +101,6 @@ function render(): void {
   const filtered = allEntries.filter((e) => activeFilter === 'all' || e.kind === activeFilter)
   const visible = filtered.slice(0, visibleCount)
   const hasMoreToShow = visibleCount < filtered.length
-  const chartPoints = loading ? null : clampTimelineStart(timeline, CHART_START_MS)
 
   const listOrEmpty =
     visible.length === 0
@@ -149,10 +139,12 @@ function render(): void {
 
       <section class="block">
         <div class="block-head">
-          <h2>Total ALPH staked over time.</h2>
+          <h2>xALPH TVL over time.</h2>
         </div>
-        ${stakeChartHtml(chartPoints, loading, errorMessage)}
-        <p class="note" style="margin-top:14px">Reconstructed from the same events as the list below, since ${formatMonthDay(CHART_START_MS)} — not a smoothed estimate. Earlier one-off seed stakes are folded into the starting value.</p>
+        <div class="card defillama-card">
+          <iframe class="defillama-chart" width="100%" height="360" src="${defillamaChartUrl()}" title="xALPH TVL — DefiLlama" frameborder="0" loading="lazy"></iframe>
+        </div>
+        <p class="note" style="margin-top:14px">Chart via <a href="https://defillama.com/protocol/xalph" target="_blank" rel="noopener">DefiLlama</a>.</p>
       </section>
 
       <section class="block">
@@ -182,7 +174,6 @@ function render(): void {
   })
   bindThemeToggle(render)
   bindSentinel()
-  bindStakeChart(chartPoints)
 }
 
 function bindSentinel(): void {
@@ -202,9 +193,8 @@ async function load(): Promise<void> {
   loading = true
   render()
   try {
-    const history = await fetchStakingHistory()
-    allEntries = history.entries.filter((e) => !HIDDEN_KINDS.includes(e.kind))
-    timeline = history.timeline
+    const entries = await fetchStakingHistory()
+    allEntries = entries.filter((e) => !HIDDEN_KINDS.includes(e.kind))
     errorMessage = null
   } catch (err) {
     errorMessage = err instanceof Error ? err.message : 'unknown error'

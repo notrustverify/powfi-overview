@@ -2,12 +2,14 @@ export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 }
 
+// undefined locale = the browser's own default (correct thousands/decimal separators,
+// currency symbol placement, etc. for whoever's actually viewing the page).
 export function formatCompact(n: number, digits = 2): string {
-  return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: digits }).format(n)
+  return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: digits }).format(n)
 }
 
 export function formatUsd(n: number, digits = 0): string {
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat(undefined, {
     style: 'currency',
     currency: 'USD',
     notation: n >= 10000 ? 'compact' : 'standard',
@@ -16,7 +18,7 @@ export function formatUsd(n: number, digits = 0): string {
 }
 
 export function formatNumber(n: number, digits = 2): string {
-  return new Intl.NumberFormat('en-US', { maximumFractionDigits: digits }).format(n)
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: digits }).format(n)
 }
 
 export function formatPercent(n: number, digits = 1): string {
@@ -69,5 +71,5 @@ export function formatRelativeToNow(targetMs: number): string {
 
 /** e.g. "Oct 24" — no year, for dates that are always within the current-ish range. */
 export function formatMonthDay(ms: number): string {
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(ms)
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(ms)
 }

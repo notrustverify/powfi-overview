@@ -255,6 +255,14 @@ section.block {
   color: var(--accent);
 }
 
+.value-usd {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-faint);
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
 .progress-card .row .target {
   font-size: 13px;
   color: var(--ink-faint);
@@ -768,90 +776,13 @@ footer a:hover {
   }
 }
 
-.chart-card {
-  position: relative;
-  padding: 16px 8px 8px;
+.defillama-card {
+  padding: 8px;
 }
 
-.chart-svg {
-  width: 100%;
-  height: auto;
+.defillama-chart {
   display: block;
-  overflow: visible;
-}
-
-.chart-grid {
-  stroke: var(--surface-border);
-  stroke-width: 1;
-}
-
-.chart-axis-label {
-  fill: var(--ink-faint);
-  font-size: 11px;
-  font-family: var(--font);
-}
-
-.chart-area {
-  fill: var(--accent);
-  fill-opacity: 0.1;
-  stroke: none;
-}
-
-.chart-line {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 2;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-
-.chart-end-label {
-  fill: var(--ink);
-  font-size: 12px;
-  font-weight: 700;
-  font-family: var(--font);
-}
-
-.chart-crosshair {
-  stroke: var(--ink-faint);
-  stroke-width: 1;
-  pointer-events: none;
-  transition: opacity 0.1s ease;
-}
-
-.chart-dot {
-  fill: var(--accent);
-  stroke: var(--surface);
-  stroke-width: 2;
-  pointer-events: none;
-  transition: opacity 0.1s ease;
-}
-
-.chart-hit-area {
-  cursor: crosshair;
-}
-
-.chart-tooltip {
-  position: absolute;
-  transform: translate(-50%, -100%);
-  background: var(--surface);
-  border: 1px solid var(--surface-border);
+  width: 100%;
+  border: none;
   border-radius: 10px;
-  padding: 8px 12px;
-  box-shadow: var(--card-shadow);
-  pointer-events: none;
-  transition: opacity 0.1s ease;
-  white-space: nowrap;
-  z-index: 10;
-}
-
-.chart-tooltip-date {
-  font-size: 11px;
-  color: var(--ink-faint);
-}
-
-.chart-tooltip-value {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ink);
 }

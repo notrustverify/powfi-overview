@@ -235,7 +235,7 @@ function render(): void {
           <a class="share-btn" href="${stakedTweetUrl(d.vault.alphStaked, stakedPct, d.poolAlphUsdt.price.price1Per0)}" target="_blank" rel="noopener">Share on 𝕏</a>
         </div>
         <div class="grid">
-          ${progressCard(`${formatCompact(d.vault.alphStaked)} ALPH`, d.vault.alphStaked, TARGETS.stakedAlph, `${formatCompact(TARGETS.stakedAlph)} ALPH`, 'ALPH staked')}
+          ${progressCard(`${formatCompact(d.vault.alphStaked)} ALPH <span class="value-usd">≈ ${formatUsd(d.vault.alphStaked * d.alphPriceUsd)}</span>`, d.vault.alphStaked, TARGETS.stakedAlph, `${formatCompact(TARGETS.stakedAlph)} ALPH`, 'ALPH staked')}
           ${progressCard(formatPercent(stakedPct, 2), stakedPct, TARGETS.stakingShareOfCirculatingPct, `${formatPercent(TARGETS.stakingShareOfCirculatingPct, 0)}`, 'of circulating ALPH')}
         </div>
         <p class="note">*While staking sits below target, APY will be significantly higher.</p>
