@@ -95,11 +95,12 @@ interface PowfiStakingStatsResponse {
 
 // PowFi's own staking stats endpoint — the same one powfi.alephium.org/staking
 // reads for its "APR" stat: a 7-day moving average of realized staking returns.
+// `apr` is already a plain percentage (e.g. "7.12" means 7.12%), not a fraction.
 async function fetchStakingApr(): Promise<{ currentAprPct: number; aprIsPartial: boolean }> {
   const res = await fetch(`${POWFI_API_URL}/stats/staking`)
   if (!res.ok) throw new Error(`PowFi staking stats API failed: ${res.status}`)
   const s: PowfiStakingStatsResponse = await res.json()
-  return { currentAprPct: Number(s.apr) / 100, aprIsPartial: s.isPartial }
+  return { currentAprPct: Number(s.apr), aprIsPartial: s.isPartial }
 }
 
 interface PowfiPoolApiResponse {
