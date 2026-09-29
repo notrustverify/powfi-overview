@@ -22,7 +22,7 @@ Data sources, all called directly from the client:
 |---|---|
 | `node.mainnet.alephium.org` (via `@alephium/web3`'s `NodeProvider`) | contract state / reserves |
 | `backend.mainnet.alephium.org` (via `@alephium/web3`'s `ExplorerProvider`) | circulating ALPH supply, token metadata |
-| CoinGecko public API | ALPH/USD spot price |
+| `api.powfi.alephium.org` | pool spot prices and TVL (ALPH/USD comes from the ALPH × USDT pool) |
 
 The campaign targets (20.5M ALPH staked, $200k pool TVL, 5%/15% target APYs, 15% of
 circulating ALPH) are fixed constants in `src/chain.ts` — update them there if a new round changes them.
