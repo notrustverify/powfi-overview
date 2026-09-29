@@ -52,6 +52,7 @@ interface UnstakeResult {
   alphAtMarket: number
   deviationPct: number
   stakingYieldAlph: number
+  swapQuoteSource: 'simulation' | 'spot' | 'none'
 }
 
 const RECENT_ADDRESSES_STORAGE_KEY = 'powfi-recent-unstake-addresses'
@@ -122,14 +123,53 @@ function explorerAddrUrl(addr: string): string {
 }
 
 function unstakeResultHtml(r: UnstakeResult): string {
-  const flat = Math.abs(r.deviationPct) < 0.01
-  const marketIsBetter = r.deviationPct > 0
   const lpXalph = r.lpPositions.reduce((s, p) => s + p.xalphAmount, 0)
   const pendingAlph = r.pendingUnstakes.reduce((s, p) => s + p.totalUnstakeAmount, 0)
   const pendingClaimableNow = r.pendingUnstakes.reduce((s, p) => s + p.claimableNow, 0)
+  const hasXalph = r.xalphBalance + lpXalph > 0
+  const differenceAlph = Math.abs(r.alphAtMarket - r.alphAtRedemption)
+  const sameOutput = differenceAlph === 0
+  const differenceAmount = differenceAlph < 0.000001 ? 'Less than 0.000001' : formatNumber(differenceAlph, 6)
+  const higherMethod = r.alphAtMarket > r.alphAtRedemption ? 'swap' : 'redemption'
+  const showHigher = hasXalph && !sameOutput
+  const percentDifference = Math.abs(r.deviationPct) < 0.001 ? '<0.001%' : formatPercent(Math.abs(r.deviationPct), 3)
+  const differenceLabel = !hasXalph
+    ? 'No xALPH to compare'
+    : sameOutput
+      ? 'Both methods return the same amount'
+      : `${differenceAmount} ALPH more from ${higherMethod === 'swap' ? 'swapping' : 'redemption'}`
+  const differenceNote = !hasXalph
+    ? 'Any pending unstakes are included equally in both totals.'
+    : sameOutput
+      ? 'Equal before network fees.'
+      : `The swap ${r.swapQuoteSource === 'spot' ? 'estimate' : 'quote'} is ${percentDifference} ${higherMethod === 'swap' ? 'above' : 'below'} vault redemption for your xALPH.`
+  const swapDescription = r.swapQuoteSource === 'simulation'
+    ? 'Pool quote · trading fee and price impact included'
+    : r.swapQuoteSource === 'spot'
+      ? 'Spot estimate · trading fee and price impact excluded'
+      : 'No xALPH available to swap'
 
   return `
     <div class="unstake-result">
+      <div class="comparison-heading"><h3>Your estimated ALPH</h3><span>${pendingAlph > 0 ? 'Includes pending unstakes in both totals' : 'For your current xALPH position'}</span></div>
+      <div class="unstake-comparison">
+        <article class="comparison-card${showHigher && higherMethod === 'redemption' ? ' is-higher' : ''}" aria-labelledby="redemption-title">
+          <div class="comparison-card-head"><h4 id="redemption-title">Vault redemption</h4>${showHigher && higherMethod === 'redemption' ? '<span class="comparison-badge">Higher amount</span>' : ''}</div>
+          <p class="comparison-amount">${formatNumber(r.alphAtRedemption, 6)} <span>ALPH</span></p>
+          <p class="comparison-method">Vault rate · 30-day linear claim</p>
+        </article>
+        <article class="comparison-card${showHigher && higherMethod === 'swap' ? ' is-higher' : ''}" aria-labelledby="swap-title">
+          <div class="comparison-card-head"><h4 id="swap-title">Market swap</h4>${showHigher && higherMethod === 'swap' ? '<span class="comparison-badge">Higher amount</span>' : ''}</div>
+          <p class="comparison-amount">${formatNumber(r.alphAtMarket, 6)} <span>ALPH</span></p>
+          <p class="comparison-method">${swapDescription}</p>
+        </article>
+      </div>
+      <div class="comparison-difference${showHigher ? ' has-difference' : ''}" role="status">
+        <strong>${differenceLabel}</strong>
+        <p>${escapeHtml(differenceNote)}</p>
+      </div>
+      <div class="position-breakdown">
+      <h3>Position breakdown</h3>
       <div class="reserve-row"><span class="sym">xALPH held (idle)</span><a class="amt addr-link" href="${explorerAddrUrl(r.address)}" target="_blank" rel="noopener">${formatNumber(r.xalphBalance, 6)}</a></div>
       ${
         r.lpPositions.length > 0
@@ -142,11 +182,9 @@ function unstakeResultHtml(r: UnstakeResult): string {
           : ''
       }
       <div class="reserve-row"><span class="sym">Staking yield earned so far</span><span class="amt" style="color:${r.stakingYieldAlph > 0 ? 'var(--good)' : 'inherit'}">+${formatNumber(r.stakingYieldAlph, 6)} ALPH</span></div>
-      <div class="reserve-row"><span class="sym">Unstake + claim everything (vault rate)</span><span class="amt">${formatNumber(r.alphAtRedemption, 6)} ALPH</span></div>
-      <div class="reserve-row"><span class="sym">Swap the xALPH instead (pool quote, fees + slippage incl.)</span><span class="amt">${formatNumber(r.alphAtMarket, 6)} ALPH</span></div>
-      <div class="reserve-row"><span class="sym">Market vs. redemption</span><span class="amt" style="color:${flat ? 'inherit' : marketIsBetter ? 'var(--good)' : 'var(--warn)'}">${r.deviationPct >= 0 ? '+' : ''}${formatNumber(r.deviationPct, 3)}%</span></div>
+      </div>
       <p class="adv-caveat">Totals include the xALPH side of any liquidity provided to the xALPH × ALPH pool (valued at the current pool price and tick range — the ALPH side of those positions isn't counted here) and any pending unstake requests already in the 30-day cooldown. Both would need to be withdrawn/claimed separately first.</p>
-      <p class="adv-caveat">The swap figure is a simulated quote for indication only — it can shift before you actually trade. Get the real, live quote at <a href="${POWFI_XALPH_TO_ALPH_SWAP_URL}" target="_blank" rel="noopener">powfi.alephium.org/swap</a>.</p>
+      <p class="adv-caveat">${r.swapQuoteSource === 'none' ? 'No xALPH conversion is included in these totals.' : r.swapQuoteSource === 'spot' ? 'The swap simulation was unavailable, so the swap amount uses the current spot rate without trading fees or price impact.' : 'The swap quote is an estimate and can change before you trade.'} Network fees are excluded from both methods. <a href="${POWFI_XALPH_TO_ALPH_SWAP_URL}" target="_blank" rel="noopener">Check the live swap quote ↗</a></p>
     </div>
   `
 }
@@ -384,8 +422,8 @@ function header(): string {
     ${navigation('overview')}
     <div class="hero">
       <div class="hero-copy"><span class="network-label"><span class="live-dot ${errorMessage ? 'is-stale' : ''}"></span>Alephium mainnet</span>
-      <h1>Proof of work.<br /><span class="accent">Put to work.</span></h1>
-      <p>Your view into PowFi. Follow liquid staking, farming liquidity, and the progress of Round 0.</p></div>
+      <h1>PowFi <span class="accent">overview</span></h1>
+      <p>Live staking, farming liquidity, and Round 0 campaign progress.</p></div>
       <div class="hero-status"><span class="round-label">CAMPAIGN <strong>ROUND 0</strong></span><div class="live-indicator">${errorMessage ? 'Data unavailable · retry' : loading ? 'Fetching live data…' : 'Auto-refresh'} <span id="next-refresh">${!loading && !errorMessage ? `in ${formatCountdown(REFRESH_INTERVAL_MS / 1000)}` : ''}</span></div><button class="refresh-btn" id="refresh-btn" ${loading ? 'disabled' : ''}>${loading ? 'Refreshing…' : '↻ Refresh data'}</button></div>
     </div>
   `
@@ -463,6 +501,7 @@ async function checkUnstake(rawAddress: string): Promise<void> {
       alphAtMarket,
       deviationPct,
       stakingYieldAlph,
+      swapQuoteSource: totalXalph <= 0 ? 'none' : swapQuote ? 'simulation' : 'spot',
     }
   } catch (err) {
     unstakeError = err instanceof Error ? err.message : 'Failed to fetch xALPH balance for this address.'

@@ -6,7 +6,7 @@ export function navigation(active: 'overview' | 'activity'): string {
     <header class="topbar">
       <a class="brand" href="${base}" aria-label="PowFi overview">
         <img class="logo-mark" src="${logoUrl()}" alt="" />
-        <span>PowFi<span class="brand-caption">BY ALEPHIUM</span></span>
+        <span>PowFi<span class="brand-caption">Community dashboard</span></span>
       </a>
       <nav class="main-nav" aria-label="Main navigation">
         <a class="nav-link ${active === 'overview' ? 'active' : ''}" ${active === 'overview' ? 'aria-current="page"' : ''} href="${base}">Overview</a>
