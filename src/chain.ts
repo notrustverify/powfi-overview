@@ -98,8 +98,8 @@ async function fetchCoinPaprikaPrice(): Promise<number> {
 }
 
 const PRICE_SOURCES: { name: string; fetch: () => Promise<number> }[] = [
-  { name: 'CoinGecko', fetch: fetchCoinGeckoPrice },
   { name: 'Alephium explorer', fetch: fetchExplorerPrice },
+  { name: 'CoinGecko', fetch: fetchCoinGeckoPrice },
   { name: 'CoinPaprika', fetch: fetchCoinPaprikaPrice },
 ]
 
