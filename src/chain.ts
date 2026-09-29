@@ -48,7 +48,7 @@ export interface PoolPrice {
 
 export interface DashboardData {
   fetchedAt: number
-  alphPriceUsd: number
+  alphPriceUsd: AlphPriceUsd | null // null when no price source is reachable
   circulatingAlph: number
   vault: {
     alphStaked: number
@@ -67,13 +67,54 @@ function attoToNumber(atto: string | bigint, decimals: number): number {
   return Number(BigInt(atto)) / 10 ** decimals
 }
 
-async function fetchAlphPriceUsd(): Promise<number> {
+export interface AlphPriceUsd {
+  usd: number
+  source: string
+}
+
+async function fetchCoinGeckoPrice(): Promise<number> {
   const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=alephium&vs_currencies=usd')
   if (!res.ok) throw new Error(`CoinGecko request failed: ${res.status}`)
   const json = await res.json()
   const price = json?.alephium?.usd
   if (typeof price !== 'number') throw new Error('Unexpected CoinGecko response shape')
   return price
+}
+
+async function fetchExplorerPrice(): Promise<number> {
+  const explorer = new ExplorerProvider(EXPLORER_API_URL)
+  const [price] = await explorer.market.postMarketPrices({ currency: 'usd' }, ['ALPH'])
+  if (typeof price !== 'number' || !(price > 0)) throw new Error('Unexpected explorer price response')
+  return price
+}
+
+async function fetchCoinPaprikaPrice(): Promise<number> {
+  const res = await fetch('https://api.coinpaprika.com/v1/tickers/alph-alephium?quotes=USD')
+  if (!res.ok) throw new Error(`CoinPaprika request failed: ${res.status}`)
+  const json = await res.json()
+  const price = json?.quotes?.USD?.price
+  if (typeof price !== 'number') throw new Error('Unexpected CoinPaprika response shape')
+  return price
+}
+
+const PRICE_SOURCES: { name: string; fetch: () => Promise<number> }[] = [
+  { name: 'Alephium explorer', fetch: fetchExplorerPrice },
+  { name: 'CoinGecko', fetch: fetchCoinGeckoPrice },
+  { name: 'CoinPaprika', fetch: fetchCoinPaprikaPrice },
+]
+
+// Tries each price source in order. A USD price is nice-to-have, not essential:
+// if every source fails (e.g. CoinGecko rate-limiting with a CloudFront 403),
+// this resolves to null and the page renders without USD values.
+async function fetchAlphPriceUsd(): Promise<AlphPriceUsd | null> {
+  for (const source of PRICE_SOURCES) {
+    try {
+      return { usd: await source.fetch(), source: source.name }
+    } catch (err) {
+      console.warn(`ALPH price from ${source.name} unavailable`, err)
+    }
+  }
+  return null
 }
 
 // Reads the vault's mutable state directly — one call instead of two separate

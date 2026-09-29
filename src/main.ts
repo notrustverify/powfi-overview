@@ -235,7 +235,7 @@ function render(): void {
           <a class="share-btn" href="${stakedTweetUrl(d.vault.alphStaked, stakedPct, d.poolAlphUsdt.price.price1Per0)}" target="_blank" rel="noopener">Share on 𝕏</a>
         </div>
         <div class="grid">
-          ${progressCard(`${formatCompact(d.vault.alphStaked)} ALPH <span class="value-usd">≈ ${formatUsd(d.vault.alphStaked * d.alphPriceUsd)}</span>`, d.vault.alphStaked, TARGETS.stakedAlph, `${formatCompact(TARGETS.stakedAlph)} ALPH`, 'ALPH staked')}
+          ${progressCard(`${formatCompact(d.vault.alphStaked)} ALPH${d.alphPriceUsd ? ` <span class="value-usd">≈ ${formatUsd(d.vault.alphStaked * d.alphPriceUsd.usd)}</span>` : ''}`, d.vault.alphStaked, TARGETS.stakedAlph, `${formatCompact(TARGETS.stakedAlph)} ALPH`, 'ALPH staked')}
           ${progressCard(formatPercent(stakedPct, 2), stakedPct, TARGETS.stakingShareOfCirculatingPct, `${formatPercent(TARGETS.stakingShareOfCirculatingPct, 0)}`, 'of circulating ALPH')}
         </div>
         <p class="note">*While staking sits below target, APY will be significantly higher.</p>
@@ -279,7 +279,7 @@ function render(): void {
             <h3>ALPH × USDT pool</h3>
             ${reserveList(d.poolAlphUsdt.reserves)}
             <div class="reserve-row"><span class="sym">Spot price (pool)</span><span class="amt">$${formatNumber(d.poolAlphUsdt.price.price1Per0, 4)}</span></div>
-            <div class="reserve-row"><span class="sym">Spot price (CoinGecko)</span><span class="amt">$${formatNumber(d.alphPriceUsd, 4)}</span></div>
+            ${d.alphPriceUsd ? `<div class="reserve-row"><span class="sym">Spot price (${d.alphPriceUsd.source})</span><span class="amt">$${formatNumber(d.alphPriceUsd.usd, 4)}</span></div>` : ''}
             <div class="reserve-row"><span class="sym">Trading fee</span><span class="amt">${formatPercent(d.poolAlphUsdt.price.feeRatePct, 2)}</span></div>
             <p class="adv-caveat">Spot price is read from the pool's current tick, pre-fee — not the same as raw reserve ratio, which is meaningless for a concentrated-liquidity pool.</p>
           </div>
@@ -304,7 +304,7 @@ function render(): void {
       <footer>
         <span id="last-updated">Updated ${relativeTime(d.fetchedAt)}</span>
         <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-          <span>ALPH ${formatUsd(d.alphPriceUsd, 4)} · circulating supply ${formatCompact(d.circulatingAlph)} ALPH · data via node.mainnet.alephium.org &amp; CoinGecko</span>
+          <span>${d.alphPriceUsd ? `ALPH ${formatUsd(d.alphPriceUsd.usd, 4)} · ` : ''}circulating supply ${formatCompact(d.circulatingAlph)} ALPH · data via node.mainnet.alephium.org${d.alphPriceUsd ? ` &amp; ${d.alphPriceUsd.source}` : ''}</span>
           <a href="${POWFI_URL}" target="_blank" rel="noopener">powfi.alephium.org ↗</a>
           <a href="${POWFI_FAQ_URL}" target="_blank" rel="noopener">FAQ ↗</a>
           <button class="refresh-btn" id="refresh-btn" ${loading ? 'disabled' : ''}>${loading ? 'Refreshing…' : 'Refresh'}</button>
