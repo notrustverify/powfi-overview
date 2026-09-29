@@ -1,8 +1,9 @@
 import './style.css'
 import { fetchStakingHistory, MAX_ACTIVITY_EVENTS, EXPLORER_APP_URL, XALPH_VAULT_ADDRESS } from './chain.ts'
 import type { StakingActivityEntry, StakingActivityKind } from './chain.ts'
-import { formatNumber, shortAddress, relativeTime, formatRelativeToNow, formatMonthDay } from './format.ts'
-import { themeToggleButton, bindThemeToggle, logoUrl, getTheme } from './theme.ts'
+import { formatNumber, shortAddress, relativeTime, formatRelativeToNow, formatMonthDay, escapeHtml } from './format.ts'
+import { bindThemeToggle, getTheme } from './theme.ts'
+import { navigation } from './ui.ts'
 
 const REVEAL_BATCH = 50 // how many more rows to render per scroll trigger — a UI reveal, not a network page
 // Hidden for now: distributeRewards() has never fired on-chain (rewardRate is 0), so this
@@ -87,7 +88,7 @@ function filterBar(): string {
   return `
     <div class="filter-bar">
       ${FILTER_OPTIONS.map(
-        (o) => `<button class="filter-btn${activeFilter === o.value ? ' active' : ''}" data-filter="${o.value}">${o.label}</button>`,
+        (o) => `<button class="filter-btn${activeFilter === o.value ? ' active' : ''}" aria-pressed="${activeFilter === o.value}" data-filter="${o.value}">${o.label}</button>`,
       ).join('')}
     </div>
   `
@@ -95,7 +96,7 @@ function filterBar(): string {
 
 function render(): void {
   const bannerHtml = errorMessage
-    ? `<div class="banner">Live data temporarily unavailable (${errorMessage}). ${allEntries.length > 0 ? 'Showing what loaded before the error.' : ''}</div>`
+    ? `<div class="banner" role="alert">Live data temporarily unavailable (${escapeHtml(errorMessage)}). ${allEntries.length > 0 ? 'Showing what loaded before the error.' : ''}</div>`
     : ''
 
   const filtered = allEntries.filter((e) => activeFilter === 'all' || e.kind === activeFilter)
@@ -117,29 +118,22 @@ function render(): void {
 
   app.innerHTML = `
     <div class="page">
-      <div class="topbar">
-        <a href="${POWFI_URL}" target="_blank" rel="noopener" title="powfi.alephium.org"><img class="logo-mark" src="${logoUrl()}" alt="Alephium" /></a>
-        <div style="display:flex;align-items:center;gap:10px">
-          <a class="nav-link" href="${import.meta.env.BASE_URL}">Dashboard</a>
-          ${themeToggleButton()}
-          <span class="pill">Round 0</span>
-        </div>
-      </div>
+      ${navigation('activity')}
 
-      <div class="hero">
-        <span class="pill">Live · Alephium mainnet</span>
-        <h1>xALPH staking <span class="accent">activity</span>.</h1>
-        <p>Every stake, unstake, and cancellation event read straight from the
+      <div class="hero activity-hero">
+        <div class="hero-copy"><span class="network-label"><span class="live-dot"></span>Alephium mainnet</span>
+        <h1>Staking, <span class="accent">in motion.</span></h1>
+        <p>Follow stakes, unstakes, and cancellations from the
           <a class="addr-link" href="${explorerAddrUrl(XALPH_VAULT_ADDRESS)}" target="_blank" rel="noopener">xALPH vault's</a>
-          on-chain event log (up to ${formatNumber(MAX_ACTIVITY_EVENTS, 0)}) — no private API involved, loaded once and revealed as you scroll.
-          Unstakes show when the ALPH becomes claimable, 30 days after the request.</p>
+          on-chain history. Explore up to ${formatNumber(MAX_ACTIVITY_EVENTS, 0)} events, with claim dates for the 30-day unstaking period.</p></div>
+        <span class="pill">ROUND 0</span>
       </div>
 
       ${bannerHtml}
 
       <section class="block">
         <div class="block-head">
-          <h2>xALPH TVL over time.</h2>
+          <div><span class="eyebrow">LIQUID STAKING</span><h2>xALPH value over time</h2></div>
         </div>
         <div class="card defillama-card">
           <iframe class="defillama-chart" width="100%" height="360" src="${defillamaChartUrl()}" title="xALPH TVL — DefiLlama" frameborder="0" loading="lazy"></iframe>
@@ -149,7 +143,7 @@ function render(): void {
 
       <section class="block">
         <div class="block-head">
-          <h2>Recent activity${allEntries.length > 0 ? ` <span class="block-head-count">(${formatNumber(allEntries.length, 0)} loaded)</span>` : ''}.</h2>
+          <h2>Recent activity${allEntries.length > 0 ? ` <span class="block-head-count">${formatNumber(allEntries.length, 0)} events loaded</span>` : ''}</h2>
           <button class="refresh-btn" id="refresh-btn" ${loading ? 'disabled' : ''}>${loading ? 'Loading…' : 'Refresh'}</button>
         </div>
         ${filterBar()}

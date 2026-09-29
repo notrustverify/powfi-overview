@@ -27,7 +27,8 @@ import {
   relativeTime,
   escapeHtml,
 } from './format.ts'
-import { themeToggleButton, bindThemeToggle, logoUrl } from './theme.ts'
+import { bindThemeToggle } from './theme.ts'
+import { navigation } from './ui.ts'
 
 const REFRESH_INTERVAL_MS = 120_000
 const POWFI_URL = 'https://powfi.alephium.org'
@@ -82,17 +83,17 @@ let unstakeLoading = false
 let unstakeError: string | null = null
 let unstakeResult: UnstakeResult | null = null
 
-function progressCard(current: string, currentRaw: number, target: number, targetLabel: string, label: string, full = false): string {
+function progressCard(current: string, currentRaw: number, target: number, targetLabel: string, label: string, description: string, token: string, secondary: string): string {
   const pct = target > 0 ? (currentRaw / target) * 100 : 0
   return `
-    <div class="card progress-card${full ? ' full' : ''}">
-      <div class="row">
-        <span class="value">${current}</span>
-        <span class="target">of ${targetLabel} target</span>
-      </div>
-      <div class="bar-track"><div class="bar-fill" style="width:${clampPct(pct)}%"></div></div>
-      <div class="foot"><span>${label} · ${formatPercent(pct, 1)} of target</span><span>${pct < 100 ? 'below target — bonus rate applies' : 'target reached'}</span></div>
-    </div>
+    <article class="card progress-card">
+      <div class="metric-heading"><span class="token-mark" aria-hidden="true">${token}</span><div><h3>${label}</h3><p>${description}</p></div></div>
+      <div class="metric-value">${current}</div>
+      <div class="metric-secondary">${secondary}</div>
+      <div class="progress-label"><span>Campaign progress</span><strong>${formatPercent(pct, 1)}</strong></div>
+      <div class="bar-track" role="progressbar" aria-label="${label} campaign target" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${clampPct(pct)}" aria-valuetext="${formatPercent(pct, 1)} of target"><div class="bar-fill" style="width:${clampPct(pct)}%"></div></div>
+      <div class="foot"><span>Target <strong>${targetLabel}</strong></span><span class="target-status ${pct >= 100 ? 'complete' : ''}">${pct < 100 ? 'In progress' : 'Target reached'}</span></div>
+    </article>
   `
 }
 
@@ -153,13 +154,15 @@ function unstakeResultHtml(r: UnstakeResult): string {
 function unstakeSection(): string {
   const body = unstakeResult
     ? unstakeResultHtml(unstakeResult)
-    : `<p class="note" style="margin:0">Enter an address holding xALPH to compare unstaking (vault redemption rate) against swapping on the xALPH × ALPH pool (market price).</p>`
+    : `<p class="calculator-hint">Compare vault redemption with a market swap, including your liquidity positions and pending unstakes.</p>`
   return `
     <section class="block" id="calculator">
       <div class="block-head">
-        <h2>Unstake calculator. <a class="anchor-link" href="#calculator" aria-label="Link to this section" title="Link to this section">#</a></h2>
+        <div><span class="eyebrow">YOUR POSITION</span><h2>Unstake calculator <a class="anchor-link" href="#calculator" aria-label="Link to this section" title="Link to this section">#</a></h2></div>
+        <span class="read-only-label">Read-only · No wallet connection</span>
       </div>
       <div class="card unstake-card">
+        <label class="input-label" for="unstake-address">Alephium address</label>
         <form id="unstake-form" class="unstake-form">
           <div class="addr-input-wrap">
             <input
@@ -170,11 +173,14 @@ function unstakeSection(): string {
               value="${escapeHtml(unstakeAddress)}"
               autocomplete="off"
               spellcheck="false"
+              aria-describedby="calculator-help${unstakeError ? ' unstake-error' : ''}"
+              aria-invalid="${Boolean(unstakeError)}"
             />
             <button type="button" class="addr-input-clear" id="unstake-address-clear" aria-label="Clear address" title="Clear">✕</button>
           </div>
-          <button type="submit" class="refresh-btn" ${unstakeLoading ? 'disabled' : ''}>${unstakeLoading ? 'Checking…' : 'Check'}</button>
+          <button type="submit" class="refresh-btn primary-btn" ${unstakeLoading ? 'disabled' : ''}>${unstakeLoading ? 'Checking…' : 'Check position →'}</button>
         </form>
+        <p class="input-help" id="calculator-help">Paste a public address to explore your xALPH position.</p>
         ${
           recentAddresses.length > 0
             ? `<div class="filter-bar">
@@ -187,7 +193,7 @@ function unstakeSection(): string {
               </div>`
             : ''
         }
-        ${unstakeError ? `<p class="unstake-error">${escapeHtml(unstakeError)}</p>` : ''}
+        ${unstakeError ? `<p class="unstake-error" id="unstake-error" role="alert">${escapeHtml(unstakeError)}</p>` : ''}
         ${body}
       </div>
     </section>
@@ -201,8 +207,11 @@ function stakedTweetUrl(alphStaked: number, circulatingPct: number, alphPriceUsd
 }
 
 function render(): void {
+  const focusedId = document.activeElement?.id
+  const activeInput = document.activeElement instanceof HTMLInputElement ? document.activeElement : null
+  const selection = activeInput ? [activeInput.selectionStart, activeInput.selectionEnd] as const : null
   const bannerHtml = errorMessage
-    ? `<div class="banner">Live data temporarily unavailable (${errorMessage}). ${data ? 'Showing last known values.' : ''}</div>`
+    ? `<div class="banner" role="alert">Live data temporarily unavailable (${escapeHtml(errorMessage)}). ${data ? 'Showing last known values.' : 'Please try again.'}</div>`
     : ''
 
   if (!data) {
@@ -210,9 +219,12 @@ function render(): void {
       <div class="page">
         ${header()}
         ${bannerHtml}
-        <p class="skeleton" style="text-align:center">${loading ? 'Loading live on-chain data…' : 'No data available.'}</p>
+        <div class="empty-state" role="status"><span class="eyebrow">${loading ? 'CONNECTING TO MAINNET' : 'CONNECTION INTERRUPTED'}</span><h2>${loading ? 'Fetching the latest numbers' : 'Unable to load live data'}</h2><p>${loading ? 'Reading staking and pool data from Alephium.' : 'Refresh to try connecting again.'}</p></div>
+        ${loading ? '<div class="campaign-grid loading-grid" aria-hidden="true"><div class="card skeleton-card"></div><div class="card skeleton-card"></div><div class="card skeleton-card"></div></div>' : ''}
       </div>
     `
+    bindThemeToggle(render)
+    document.getElementById('refresh-btn')?.addEventListener('click', () => void load())
     return
   }
 
@@ -231,30 +243,28 @@ function render(): void {
 
       <section class="block">
         <div class="block-head">
-          <h2>Campaign targets: overview.</h2>
+          <div><span class="eyebrow">ROUND 0</span><h2>Campaign progress</h2></div>
           <a class="share-btn" href="${stakedTweetUrl(d.vault.alphStaked, stakedPct, d.poolAlphUsdt.price.price1Per0)}" target="_blank" rel="noopener">Share on 𝕏</a>
         </div>
-        <div class="grid">
-          ${progressCard(`${formatCompact(d.vault.alphStaked)} ALPH <span class="value-usd">≈ ${formatUsd(d.vault.alphStaked * d.poolAlphUsdt.price.price1Per0)}</span>`, d.vault.alphStaked, TARGETS.stakedAlph, `${formatCompact(TARGETS.stakedAlph)} ALPH`, 'ALPH staked')}
-          ${progressCard(formatPercent(stakedPct, 2), stakedPct, TARGETS.stakingShareOfCirculatingPct, `${formatPercent(TARGETS.stakingShareOfCirculatingPct, 0)}`, 'of circulating ALPH')}
+        <div class="campaign-grid">
+          ${progressCard(`${formatCompact(d.vault.alphStaked)} <span class="value-unit">ALPH</span>`, d.vault.alphStaked, TARGETS.stakedAlph, `${formatCompact(TARGETS.stakedAlph)} ALPH`, 'Total staked', 'xALPH liquid staking', 'α', `≈ ${formatUsd(d.vault.alphStaked * d.poolAlphUsdt.price.price1Per0)} USD`)}
+          ${progressCard(formatPercent(stakedPct, 2), stakedPct, TARGETS.stakingShareOfCirculatingPct, formatPercent(TARGETS.stakingShareOfCirculatingPct, 0), 'Staking participation', 'Share of circulating ALPH', '%', `Of ${formatCompact(d.circulatingAlph)} ALPH in circulation`)}
+          ${progressCard(formatUsd(poolUsdtTvl), poolUsdtTvl, TARGETS.poolTvlUsd, formatUsd(TARGETS.poolTvlUsd), 'Farming liquidity', 'ALPH × USDT pool', '↔', 'Total value locked · USD')}
         </div>
-        <p class="note">*While staking sits below target, APY will be significantly higher.</p>
+        <p class="campaign-note"><span class="note-icon" aria-hidden="true">i</span> Staking and farming yields can be higher while their campaign targets remain unmet.</p>
       </section>
 
-      <section class="block">
-        <div class="block-head">
-          <h2>ALPH × USDT farming: overview.</h2>
-        </div>
-        <div class="grid">
-          ${progressCard(formatUsd(poolUsdtTvl), poolUsdtTvl, TARGETS.poolTvlUsd, formatUsd(TARGETS.poolTvlUsd), 'Pool TVL', true)}
-        </div>
-        <p class="note">*While TVL sits below target, early LPs can earn substantially higher APYs.</p>
+      <section class="market-strip" aria-label="Live market details">
+        <div><span>Staking APR <small>7d average</small></span><strong class="positive">${formatPercent(d.vault.currentAprPct, 2)}</strong>${d.vault.aprIsPartial ? '<small>Partial 7-day window</small>' : ''}</div>
+        <div><span>xALPH redemption rate</span><strong>${formatNumber(d.vault.redemptionRate, 6)} <small>ALPH</small></strong></div>
+        <div><span>ALPH spot price</span><strong>${formatUsd(d.poolAlphUsdt.price.price1Per0, 4)}</strong></div>
+        <a href="${import.meta.env.BASE_URL}activity.html">Explore staking activity <span aria-hidden="true">↗</span></a>
       </section>
 
       ${unstakeSection()}
 
       <details class="advanced" ${advancedOpen ? 'open' : ''}>
-        <summary>Advanced recap<span class="chevron">▾</span></summary>
+        <summary><span>Explore the details<small>Campaign parameters, reserves &amp; contracts</small></span><span class="chevron">⌄</span></summary>
         <div class="advanced-body">
           <div class="adv-group">
             <h3>Campaign parameters</h3>
@@ -306,7 +316,6 @@ function render(): void {
           <span>ALPH ${formatUsd(d.poolAlphUsdt.price.price1Per0, 4)} · circulating supply ${formatCompact(d.circulatingAlph)} ALPH · data via node.mainnet.alephium.org &amp; api.powfi.alephium.org</span>
           <a href="${POWFI_URL}" target="_blank" rel="noopener">powfi.alephium.org ↗</a>
           <a href="${POWFI_FAQ_URL}" target="_blank" rel="noopener">FAQ ↗</a>
-          <button class="refresh-btn" id="refresh-btn" ${loading ? 'disabled' : ''}>${loading ? 'Refreshing…' : 'Refresh'}</button>
         </span>
       </footer>
     </div>
@@ -321,17 +330,27 @@ function render(): void {
     const input = document.getElementById('unstake-address') as HTMLInputElement | null
     void checkUnstake(input?.value ?? '')
   })
+  document.getElementById('unstake-address')?.addEventListener('input', (e) => {
+    unstakeAddress = (e.target as HTMLInputElement).value
+  })
   document.querySelectorAll<HTMLButtonElement>('.recent-addr-btn').forEach((btn) => {
     btn.addEventListener('click', () => void checkUnstake(btn.dataset.address ?? ''))
   })
   document.getElementById('unstake-address-clear')?.addEventListener('click', () => {
-    const input = document.getElementById('unstake-address') as HTMLInputElement | null
-    if (input) {
-      input.value = ''
-      input.focus()
-    }
+    unstakeAddress = ''
+    unstakeError = null
+    unstakeResult = null
+    render()
+    document.getElementById('unstake-address')?.focus()
   })
   bindThemeToggle(render)
+  if (focusedId) {
+    const replacement = document.getElementById(focusedId)
+    replacement?.focus({ preventScroll: true })
+    if (replacement instanceof HTMLInputElement && selection) {
+      replacement.setSelectionRange(selection[0], selection[1])
+    }
+  }
   scrollToHashOnce()
   tick()
 }
@@ -357,24 +376,17 @@ function tick(): void {
   lastUpdatedEl.textContent = `Updated ${relativeTime(data.fetchedAt)}`
 
   const remainingMs = data.fetchedAt + REFRESH_INTERVAL_MS - Date.now()
-  nextRefreshEl.textContent = loading ? '…' : `in ${formatCountdown(Math.ceil(remainingMs / 1000))}`
+  nextRefreshEl.textContent = loading ? '…' : errorMessage ? '' : `in ${formatCountdown(Math.ceil(remainingMs / 1000))}`
 }
 
 function header(): string {
   return `
-    <div class="topbar">
-      <a href="${POWFI_URL}" target="_blank" rel="noopener" title="powfi.alephium.org"><img class="logo-mark" src="${logoUrl()}" alt="Alephium" /></a>
-      <div style="display:flex;align-items:center;gap:10px">
-        <a class="nav-link" href="${import.meta.env.BASE_URL}activity">Activity</a>
-        ${themeToggleButton()}
-        <span class="pill">Round 0</span>
-      </div>
-    </div>
+    ${navigation('overview')}
     <div class="hero">
-      <span class="pill">Live · Alephium mainnet</span>
-      <h1>PowFi <span class="accent">Round 0</span> goals.</h1>
-      <p>Tracking the ALPH × USDT farming and xALPH staking campaign targets live, straight from Alephium mainnet.</p>
-      <div class="live-indicator"><span class="live-dot"></span>Auto-refresh <span id="next-refresh">in ${formatCountdown(REFRESH_INTERVAL_MS / 1000)}</span></div>
+      <div class="hero-copy"><span class="network-label"><span class="live-dot ${errorMessage ? 'is-stale' : ''}"></span>Alephium mainnet</span>
+      <h1>Proof of work.<br /><span class="accent">Put to work.</span></h1>
+      <p>Your view into PowFi. Follow liquid staking, farming liquidity, and the progress of Round 0.</p></div>
+      <div class="hero-status"><span class="round-label">CAMPAIGN <strong>ROUND 0</strong></span><div class="live-indicator">${errorMessage ? 'Data unavailable · retry' : loading ? 'Fetching live data…' : 'Auto-refresh'} <span id="next-refresh">${!loading && !errorMessage ? `in ${formatCountdown(REFRESH_INTERVAL_MS / 1000)}` : ''}</span></div><button class="refresh-btn" id="refresh-btn" ${loading ? 'disabled' : ''}>${loading ? 'Refreshing…' : '↻ Refresh data'}</button></div>
     </div>
   `
 }
