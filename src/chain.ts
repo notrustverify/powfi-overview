@@ -81,13 +81,6 @@ async function fetchCoinGeckoPrice(): Promise<number> {
   return price
 }
 
-async function fetchExplorerPrice(): Promise<number> {
-  const explorer = new ExplorerProvider(EXPLORER_API_URL)
-  const [price] = await explorer.market.postMarketPrices({ currency: 'usd' }, ['ALPH'])
-  if (typeof price !== 'number' || !(price > 0)) throw new Error('Unexpected explorer price response')
-  return price
-}
-
 async function fetchCoinPaprikaPrice(): Promise<number> {
   const res = await fetch('https://api.coinpaprika.com/v1/tickers/alph-alephium?quotes=USD')
   if (!res.ok) throw new Error(`CoinPaprika request failed: ${res.status}`)
@@ -98,9 +91,8 @@ async function fetchCoinPaprikaPrice(): Promise<number> {
 }
 
 const PRICE_SOURCES: { name: string; fetch: () => Promise<number> }[] = [
-  { name: 'Alephium explorer', fetch: fetchExplorerPrice },
-  { name: 'CoinGecko', fetch: fetchCoinGeckoPrice },
   { name: 'CoinPaprika', fetch: fetchCoinPaprikaPrice },
+  { name: 'CoinGecko', fetch: fetchCoinGeckoPrice },
 ]
 
 // Tries each price source in order. A USD price is nice-to-have, not essential:
