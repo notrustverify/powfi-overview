@@ -151,17 +151,26 @@ h2:hover .anchor-link, .anchor-link:focus-visible { opacity: 1; }
 .unstake-error { color: var(--warn); font-size: 12px; margin: 0; }
 .unstake-result { display: flex; flex-direction: column; gap: 13px; border-top: 1px solid var(--surface-border); padding-top: 20px; }
 .comparison-heading { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; margin: 2px 0 3px; }
-.comparison-heading h3, .position-breakdown h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.yield-highlight { padding: 22px 24px; border: 1px solid rgba(var(--good-rgb), .35); border-radius: 9px; background: rgba(var(--good-rgb), .07); }
+.yield-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.yield-heading .eyebrow { margin: 0; }
+.yield-share { min-height: 32px; padding: 6px 10px; font-size: 11px; }
+.yield-highlight h3 { margin: 13px 0 0; color: var(--ink-muted); font-size: 14px; font-weight: 550; }
+.yield-amount { margin: 3px 0 0; color: var(--good); font-size: clamp(32px, 4vw, 44px); font-weight: 650; line-height: 1.25; letter-spacing: -1.4px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.yield-amount span { font-size: .48em; font-weight: 550; letter-spacing: 0; }
+.yield-caption { margin: 6px 0 0; color: var(--ink-muted); font-size: 12px; }
+.comparison-heading h3 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.3px; }
+.position-breakdown h3 { margin: 0; font-size: 14px; font-weight: 600; }
 .comparison-heading > span { font-size: 12px; color: var(--ink-faint); }
 .unstake-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .comparison-card { min-width: 0; padding: 22px; border: 1px solid var(--surface-border); border-radius: 9px; background: var(--bg); }
 .comparison-card.is-higher { border-color: rgba(var(--good-rgb), .45); background: rgba(var(--good-rgb), .05); }
 .comparison-card-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 25px; }
-.comparison-card h4 { margin: 0; font-size: 14px; font-weight: 600; }
+.comparison-route { color: var(--ink-faint); font-family: var(--mono); font-size: 11px; letter-spacing: .6px; }
 .comparison-badge { padding: 4px 7px; border-radius: 4px; background: rgba(var(--good-rgb), .1); color: var(--good); font-size: 11px; font-weight: 600; }
-.comparison-amount { margin: 20px 0 10px; font-size: clamp(23px, 2.6vw, 32px); font-weight: 600; line-height: 1.3; letter-spacing: -.8px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.comparison-amount { margin: 13px 0 7px; font-size: clamp(26px, 3vw, 36px); font-weight: 650; line-height: 1.25; letter-spacing: -1px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .comparison-amount > span { display: inline-block; color: var(--ink-muted); font-size: 14px; font-weight: 500; letter-spacing: 0; }
-.comparison-method { margin: 0; font-size: 12px; color: var(--ink-muted); }
+.comparison-method { margin: 0; font-size: 12px; color: var(--ink-faint); }
 .comparison-difference { padding: 15px 18px; border: 1px solid var(--surface-border); border-radius: 7px; background: var(--bg); }
 .comparison-difference.has-difference { border-color: rgba(var(--good-rgb), .2); background: rgba(var(--good-rgb), .06); }
 .comparison-difference strong { font-size: 14px; font-weight: 600; }

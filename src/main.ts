@@ -148,20 +148,29 @@ function unstakeResultHtml(r: UnstakeResult): string {
     : r.swapQuoteSource === 'spot'
       ? 'Spot estimate · trading fee and price impact excluded'
       : 'No xALPH available to swap'
+  const stakingYieldUsdt = r.stakingYieldAlph * (data?.poolAlphUsdt.price.price1Per0 ?? 0)
+  const yieldShareText = `I've earned ${formatNumber(r.stakingYieldAlph, 3)} $ALPH (~${formatNumber(stakingYieldUsdt, 2)} USDT) in staking yield with PowFi, @alephium's liquid staking platform.`
+  const yieldShareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(yieldShareText)}`
 
   return `
     <div class="unstake-result">
-      <div class="comparison-heading"><h3>Your estimated ALPH</h3><span>${pendingAlph > 0 ? 'Includes pending unstakes in both totals' : 'For your current xALPH position'}</span></div>
+      <section class="yield-highlight" aria-labelledby="staking-yield-title">
+        <div class="yield-heading"><span class="eyebrow">VAULT EARNINGS</span>${hasXalph ? `<a class="share-btn yield-share" href="${yieldShareUrl}" target="_blank" rel="noopener noreferrer" aria-label="Share your staking yield on X">Share on 𝕏 <span aria-hidden="true">↗</span></a>` : ''}</div>
+        <h3 id="staking-yield-title">Staking yield earned so far</h3>
+        <p class="yield-amount">${hasXalph ? `+${formatNumber(r.stakingYieldAlph, 3)} <span>ALPH</span>` : 'No xALPH balance found'}</p>
+        <p class="yield-caption">${hasXalph ? `≈ ${formatNumber(stakingYieldUsdt, 2)} USDT · Yield reflected in the redemption rate of your idle and LP xALPH.` : 'An xALPH balance is needed to calculate earned yield.'}</p>
+      </section>
+      <div class="comparison-heading"><h3>Estimated ALPH you could receive</h3><span>${pendingAlph > 0 ? `Includes ${formatNumber(pendingAlph, 3)} ALPH in pending unstakes` : 'For your current xALPH position'}</span></div>
       <div class="unstake-comparison">
         <article class="comparison-card${showHigher && higherMethod === 'redemption' ? ' is-higher' : ''}" aria-labelledby="redemption-title">
-          <div class="comparison-card-head"><h4 id="redemption-title">Vault redemption</h4>${showHigher && higherMethod === 'redemption' ? '<span class="comparison-badge">Higher amount</span>' : ''}</div>
-          <p class="comparison-amount">${formatNumber(r.alphAtRedemption, 6)} <span>ALPH</span></p>
-          <p class="comparison-method">Vault rate · 30-day linear claim</p>
+          <div class="comparison-card-head"><span class="comparison-route" id="redemption-title">VIA VAULT REDEMPTION</span>${showHigher && higherMethod === 'redemption' ? '<span class="comparison-badge">Higher amount</span>' : ''}</div>
+          <p class="comparison-amount">${formatNumber(r.alphAtRedemption, 3)} <span>ALPH</span></p>
+          <p class="comparison-method">30-day linear claim</p>
         </article>
         <article class="comparison-card${showHigher && higherMethod === 'swap' ? ' is-higher' : ''}" aria-labelledby="swap-title">
-          <div class="comparison-card-head"><h4 id="swap-title">Market swap</h4>${showHigher && higherMethod === 'swap' ? '<span class="comparison-badge">Higher amount</span>' : ''}</div>
-          <p class="comparison-amount">${formatNumber(r.alphAtMarket, 6)} <span>ALPH</span></p>
-          <p class="comparison-method">${swapDescription}</p>
+          <div class="comparison-card-head"><span class="comparison-route" id="swap-title">VIA MARKET SWAP</span>${showHigher && higherMethod === 'swap' ? '<span class="comparison-badge">Higher amount</span>' : ''}</div>
+          <p class="comparison-amount">${formatNumber(r.alphAtMarket, 3)} <span>ALPH</span></p>
+          <p class="comparison-method">${swapDescription.replace('Pool quote · ', '').replace('Spot estimate · ', '')}</p>
         </article>
       </div>
       <div class="comparison-difference${showHigher ? ' has-difference' : ''}" role="status">
@@ -181,7 +190,6 @@ function unstakeResultHtml(r: UnstakeResult): string {
           ? `<div class="reserve-row"><span class="sym">Pending unstake (${r.pendingUnstakes.length} request${r.pendingUnstakes.length === 1 ? '' : 's'})</span><span class="amt">${formatNumber(pendingAlph, 6)} ALPH <small class="activity-claim-date">(${formatNumber(pendingClaimableNow, 4)} claimable now)</small></span></div>`
           : ''
       }
-      <div class="reserve-row"><span class="sym">Staking yield earned so far</span><span class="amt" style="color:${r.stakingYieldAlph > 0 ? 'var(--good)' : 'inherit'}">+${formatNumber(r.stakingYieldAlph, 6)} ALPH</span></div>
       </div>
       <p class="adv-caveat">Totals include the xALPH side of any liquidity provided to the xALPH × ALPH pool (valued at the current pool price and tick range — the ALPH side of those positions isn't counted here) and any pending unstake requests already in the 30-day cooldown. Both would need to be withdrawn/claimed separately first.</p>
       <p class="adv-caveat">${r.swapQuoteSource === 'none' ? 'No xALPH conversion is included in these totals.' : r.swapQuoteSource === 'spot' ? 'The swap simulation was unavailable, so the swap amount uses the current spot rate without trading fees or price impact.' : 'The swap quote is an estimate and can change before you trade.'} Network fees are excluded from both methods. <a href="${POWFI_XALPH_TO_ALPH_SWAP_URL}" target="_blank" rel="noopener">Check the live swap quote ↗</a></p>
