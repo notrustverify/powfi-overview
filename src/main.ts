@@ -101,10 +101,9 @@ function progressCard(current: string, currentRaw: number, target: number, targe
       <div class="metric-heading"><span class="token-mark" aria-hidden="true">${token}</span><div><h3>${label}</h3><p>${description}</p></div></div>
       <div class="metric-value">${current}</div>
       <div class="metric-secondary">${secondary}</div>
-      <div class="progress-label"><span>Campaign progress</span><strong>${formatPercent(pct, 1)}</strong></div>
+      <div class="progress-label"><span>Target <strong>${targetLabel}</strong></span><strong>${formatPercent(pct, 1)}</strong></div>
       <div class="bar-track" role="progressbar" aria-label="${label} campaign target" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${clampPct(pct)}" aria-valuetext="${formatPercent(pct, 1)} of target"><div class="bar-fill" style="width:${clampPct(pct)}%"></div></div>
-      <div class="foot"><span>Target <strong>${targetLabel}</strong></span><span class="target-status ${pct >= 100 ? 'complete' : ''}">${pct < 100 ? 'In progress' : 'Target reached'}</span></div>
-      <span class="stat-flip-hint" aria-hidden="true">Click to flip <span>↻</span></span>
+      <div class="foot"><span class="target-status ${pct >= 100 ? 'complete' : ''}">${pct < 100 ? 'In progress' : 'Target reached'}</span><span class="stat-flip-hint" aria-hidden="true">Click to flip <span>↻</span></span></div>
       </div>
       <div class="stat-face stat-back" aria-hidden="${!flipped}">
         <h3 class="pie-heading">${label}</h3>
