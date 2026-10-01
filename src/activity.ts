@@ -71,8 +71,8 @@ function claimableCell(e: StakingActivityEntry): string {
 function activityRow(e: StakingActivityEntry): string {
   const amountLabel =
     e.kind === 'rewardDeposited'
-      ? `${formatNumber(e.alphAmount, 4)} ALPH`
-      : `${formatNumber(e.alphAmount, 4)} ALPH ↔ ${formatNumber(e.xalphAmount, 4)} xALPH`
+      ? `${formatNumber(e.alphAmount, 0)} ALPH`
+      : `${formatNumber(e.alphAmount, 0)} ALPH ↔ ${formatNumber(e.xalphAmount, 0)} xALPH`
   return `
     <a class="activity-row" href="${explorerTxUrl(e.txHash)}" target="_blank" rel="noopener">
       <span class="kind-badge ${KIND_CLASS[e.kind]}">${KIND_LABEL[e.kind]}</span>
