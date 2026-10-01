@@ -42,6 +42,7 @@ let data: DashboardData | null = null
 let errorMessage: string | null = null
 let loading = true
 let advancedOpen = false
+const flippedStats = new Set<string>()
 
 interface UnstakeResult {
   address: string
@@ -86,14 +87,41 @@ let unstakeResult: UnstakeResult | null = null
 
 function progressCard(current: string, currentRaw: number, target: number, targetLabel: string, label: string, description: string, token: string, secondary: string): string {
   const pct = target > 0 ? (currentRaw / target) * 100 : 0
+  const share = clampPct(pct)
+  const formatChartAmount = (amount: number): string => token === '↔'
+    ? formatUsd(amount)
+    : `${formatCompact(token === '%' ? amount * data!.circulatingAlph / 100 : amount)} ALPH`
+  const reachedLabel = token === '↔' ? 'Pool liquidity' : 'ALPH staked'
+  const remainingLabel = token === '↔' ? 'Liquidity to target' : 'ALPH to target'
+  const flipped = flippedStats.has(label)
+  const chartSummary = `${formatPercent(pct, 1)} of the ${targetLabel} campaign target reached, ${formatChartAmount(Math.max(0, target - currentRaw))} remaining`
   return `
-    <article class="card progress-card">
+    <article class="card progress-card${flipped ? ' is-flipped' : ''}" id="stat-${label.toLowerCase().replaceAll(' ', '-')}" role="button" tabindex="0" data-stat="${label}" data-chart-summary="${chartSummary}" aria-pressed="${flipped}" aria-label="${label}: ${flipped ? `${chartSummary}. Show stats` : 'show campaign target pie chart'}" title="${flipped ? 'Click to flip back' : 'Click to flip'}">
+      <div class="stat-face stat-front" aria-hidden="${flipped}">
       <div class="metric-heading"><span class="token-mark" aria-hidden="true">${token}</span><div><h3>${label}</h3><p>${description}</p></div></div>
       <div class="metric-value">${current}</div>
       <div class="metric-secondary">${secondary}</div>
       <div class="progress-label"><span>Campaign progress</span><strong>${formatPercent(pct, 1)}</strong></div>
       <div class="bar-track" role="progressbar" aria-label="${label} campaign target" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${clampPct(pct)}" aria-valuetext="${formatPercent(pct, 1)} of target"><div class="bar-fill" style="width:${clampPct(pct)}%"></div></div>
       <div class="foot"><span>Target <strong>${targetLabel}</strong></span><span class="target-status ${pct >= 100 ? 'complete' : ''}">${pct < 100 ? 'In progress' : 'Target reached'}</span></div>
+      <span class="stat-flip-hint" aria-hidden="true">Click to flip <span>↻</span></span>
+      </div>
+      <div class="stat-face stat-back" aria-hidden="${!flipped}">
+        <h3 class="pie-heading">${label}</h3>
+        <svg class="stat-pie" viewBox="0 0 200 200" role="img" aria-label="${label}: ${chartSummary}.">
+          <title>${label}: ${chartSummary}</title>
+          <circle class="pie-track" cx="100" cy="100" r="80" />
+          <circle class="pie-fill" cx="100" cy="100" r="80" pathLength="100" stroke-dasharray="${share} ${100 - share}" transform="rotate(-90 100 100)" />
+          <text class="pie-percent" x="100" y="89">${formatPercent(pct, 1)}</text>
+          <text class="pie-caption" x="100" y="115">${pct >= 100 ? 'Target reached' : 'of target reached'}</text>
+          <text class="pie-target" x="100" y="134">${targetLabel}</text>
+        </svg>
+        <div class="pie-legend">
+          <div><span><i class="pie-legend-reached" aria-hidden="true"></i>${reachedLabel}</span><strong>${formatChartAmount(currentRaw)}</strong></div>
+          <div><span><i class="pie-legend-remaining" aria-hidden="true"></i>${remainingLabel}</span><strong>${formatChartAmount(Math.max(0, target - currentRaw))}</strong></div>
+        </div>
+        <span class="stat-flip-hint" aria-hidden="true">Click to flip back <span>↻</span></span>
+      </div>
     </article>
   `
 }
@@ -368,6 +396,26 @@ function render(): void {
   `
 
   document.getElementById('refresh-btn')?.addEventListener('click', () => void load())
+  document.querySelectorAll<HTMLElement>('.progress-card[data-stat]').forEach((card) => {
+    const flip = (): void => {
+      const label = card.dataset.stat!
+      const flipped = card.classList.toggle('is-flipped')
+      if (flipped) flippedStats.add(label)
+      else flippedStats.delete(label)
+      card.setAttribute('aria-pressed', String(flipped))
+      card.setAttribute('aria-label', `${label}: ${flipped ? `${card.dataset.chartSummary}. Show stats` : 'show campaign target pie chart'}`)
+      card.title = flipped ? 'Click to flip back' : 'Click to flip'
+      card.querySelector('.stat-front')?.setAttribute('aria-hidden', String(flipped))
+      card.querySelector('.stat-back')?.setAttribute('aria-hidden', String(!flipped))
+    }
+    card.addEventListener('click', flip)
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        flip()
+      }
+    })
+  })
   document.querySelector('.advanced')?.addEventListener('toggle', (e) => {
     advancedOpen = (e.target as HTMLDetailsElement).open
   })

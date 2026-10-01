@@ -94,7 +94,37 @@ section.block { margin-bottom: 30px; }
 .block-head h2 { font-size: 19px; font-weight: 600; letter-spacing: -.4px; margin: 0; }
 .campaign-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .card { min-width: 0; background: var(--surface); border: 1px solid var(--surface-border); border-radius: 12px; padding: 25px; }
-.progress-card { position: relative; overflow: hidden; }
+.progress-card { --pie-color: var(--accent-bright); position: relative; overflow: hidden; display: grid; cursor: pointer; perspective: 900px; transition: border-color .2s, box-shadow .2s; }
+.progress-card:hover { border-color: var(--ink-faint); box-shadow: 0 5px 18px rgba(var(--ink-rgb), .06); }
+.progress-card:nth-child(2) { --pie-color: var(--good); }
+.progress-card:nth-child(3) { --pie-color: #b8a078; }
+.stat-face { grid-area: 1 / 1; min-width: 0; backface-visibility: hidden; transition: transform .5s ease, opacity .25s ease; }
+.stat-front { transform: rotateY(0); }
+.stat-back { display: flex; flex-direction: column; align-items: center; justify-content: center; transform: rotateY(-180deg); opacity: 0; pointer-events: none; }
+.is-flipped .stat-front { transform: rotateY(180deg); opacity: 0; pointer-events: none; }
+.is-flipped .stat-back { transform: rotateY(0); opacity: 1; pointer-events: auto; }
+.stat-flip-hint { display: flex; align-items: center; justify-content: flex-end; gap: 7px; margin-top: 14px; font-size: 11px; color: var(--ink-faint); }
+.stat-flip-hint span { font-size: 16px; line-height: 1; }
+.pie-heading { margin: 0 0 6px; align-self: flex-start; color: var(--ink); font-size: 13px; font-weight: 650; }
+.stat-pie { display: block; width: min(100%, 180px); overflow: visible; }
+.pie-legend { display: grid; gap: 5px; width: 100%; margin-top: 8px; color: var(--ink-muted); font-size: 12px; }
+.pie-legend > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pie-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.pie-legend strong { color: var(--ink); font-size: 12px; font-weight: 550; font-variant-numeric: tabular-nums; }
+.pie-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+.pie-legend-reached { background: var(--pie-color); }
+.pie-legend-remaining { background: var(--track); border: 1px solid var(--surface-border); }
+.stat-back .stat-flip-hint { align-self: flex-end; }
+.pie-track, .pie-fill { fill: none; stroke-width: 22; }
+.pie-track { stroke: var(--track); }
+.pie-fill { stroke: var(--pie-color); }
+.stat-pie text { text-anchor: middle; dominant-baseline: central; font-family: var(--font); font-variant-numeric: tabular-nums; }
+.pie-percent { fill: var(--ink); font-size: 32px; font-weight: 600; letter-spacing: -1px; }
+.pie-caption { fill: var(--ink-muted); font-size: 11px; }
+.pie-target { fill: var(--ink-faint); font-size: 11px; }
+@media (prefers-reduced-motion: reduce) {
+  .stat-face { transition: none; }
+}
 .progress-card:first-child { border-color: var(--accent-border); }
 .progress-card:first-child::before { content: ''; position: absolute; height: 3px; top: 0; left: 0; right: 0; background: var(--accent-bright); }
 .metric-heading { display: flex; align-items: center; gap: 11px; }
