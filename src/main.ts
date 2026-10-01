@@ -331,7 +331,7 @@ function render(): void {
         <div><span>Staking APR <small>7d average</small></span><strong class="positive">${formatPercent(d.vault.currentAprPct, 2)}</strong>${d.vault.aprIsPartial ? '<small>Partial 7-day window</small>' : ''}</div>
         <div><span>xALPH redemption rate</span><strong>${formatNumber(d.vault.redemptionRate, 6)} <small>ALPH</small></strong></div>
         <div><span>ALPH spot price</span><strong>${formatUsd(d.poolAlphUsdt.price.price1Per0, 4)}</strong></div>
-        <a href="${import.meta.env.BASE_URL}activity.html">Explore staking activity <span aria-hidden="true">↗</span></a>
+        <a href="${import.meta.env.BASE_URL}activity">Explore staking activity <span aria-hidden="true">↗</span></a>
       </section>
 
       ${unstakeSection()}

@@ -42,20 +42,24 @@ export function formatCountdown(totalSeconds: number): string {
   return rest === 0 ? `${minutes}m` : `${minutes}m ${rest}s`
 }
 
+// A shared formatter so every call picks up the viewer's own locale (e.g. "il y a 5
+// minutes" for a French browser) instead of hand-built, English-only strings.
+const RTF = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
+
 export function relativeTime(fromMs: number): string {
   const seconds = Math.round((Date.now() - fromMs) / 1000)
-  if (seconds < 5) return 'just now'
-  if (seconds < 60) return `${seconds}s ago`
+  if (seconds < 5) return RTF.format(0, 'second')
+  if (seconds < 60) return RTF.format(-seconds, 'second')
   const minutes = Math.round(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
+  if (minutes < 60) return RTF.format(-minutes, 'minute')
   const hours = Math.round(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
+  if (hours < 24) return RTF.format(-hours, 'hour')
   const days = Math.round(hours / 24)
-  if (days < 30) return `${days}d ago`
+  if (days < 30) return RTF.format(-days, 'day')
   const months = Math.round(days / 30)
-  if (months < 12) return `${months}mo ago`
+  if (months < 12) return RTF.format(-months, 'month')
   const years = Math.round(months / 12)
-  return `${years}y ago`
+  return RTF.format(-years, 'year')
 }
 
 /** Like `relativeTime`, but for a timestamp that may be in the future (e.g. an unstake unlock date). */
@@ -65,8 +69,10 @@ export function formatRelativeToNow(targetMs: number): string {
   const minutes = Math.round(abs / 60_000)
   const hours = Math.round(abs / 3_600_000)
   const days = Math.round(abs / 86_400_000)
-  const label = minutes < 60 ? `${minutes}m` : hours < 48 ? `${hours}h` : `${days}d`
-  return diffMs >= 0 ? `in ${label}` : `${label} ago`
+  const sign = diffMs >= 0 ? 1 : -1
+  if (minutes < 60) return RTF.format(sign * minutes, 'minute')
+  if (hours < 48) return RTF.format(sign * hours, 'hour')
+  return RTF.format(sign * days, 'day')
 }
 
 /** e.g. "Oct 24" — no year, for dates that are always within the current-ish range. */

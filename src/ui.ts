@@ -10,7 +10,7 @@ export function navigation(active: 'overview' | 'activity'): string {
       </a>
       <nav class="main-nav" aria-label="Main navigation">
         <a class="nav-link ${active === 'overview' ? 'active' : ''}" ${active === 'overview' ? 'aria-current="page"' : ''} href="${base}">Overview</a>
-        <a class="nav-link ${active === 'activity' ? 'active' : ''}" ${active === 'activity' ? 'aria-current="page"' : ''} href="${base}activity.html">Activity</a>
+        <a class="nav-link ${active === 'activity' ? 'active' : ''}" ${active === 'activity' ? 'aria-current="page"' : ''} href="${base}activity">Activity</a>
         <a class="nav-link" href="${base}#calculator">Calculator</a>
       </nav>
       <div class="topbar-actions">
