@@ -74,13 +74,13 @@ function activityRow(e: StakingActivityEntry): string {
       ? `${formatNumber(e.alphAmount, 0)} ALPH`
       : `${formatNumber(e.alphAmount, 0)} ALPH ↔ ${formatNumber(e.xalphAmount, 0)} xALPH`
   return `
-    <a class="activity-row" href="${explorerTxUrl(e.txHash)}" target="_blank" rel="noopener">
-      <span class="kind-badge ${KIND_CLASS[e.kind]}">${KIND_LABEL[e.kind]}</span>
-      <span class="activity-addr"><span title="${escapeHtml(e.address)}">${shortAddress(e.address)}</span>${e.referralAddress ? `<span class="activity-referral" title="Referral: ${escapeHtml(e.referralAddress)}"><span>Referral</span> ${shortAddress(e.referralAddress)}</span>` : ''}</span>
+    <div class="activity-row">
+      <a class="kind-badge activity-transaction ${KIND_CLASS[e.kind]}" href="${explorerTxUrl(e.txHash)}" target="_blank" rel="noopener noreferrer" aria-label="${KIND_LABEL[e.kind]} · view transaction">${KIND_LABEL[e.kind]}</a>
+      <span class="activity-addr"><span title="${escapeHtml(e.address)}">${shortAddress(e.address)}</span>${e.referralAddress ? `<span class="activity-referral"><span>Referral</span> <a href="${explorerAddrUrl(e.referralAddress)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(e.referralAddress)}" aria-label="View referral address ${escapeHtml(e.referralAddress)} on Explorer">${shortAddress(e.referralAddress)} ↗</a></span>` : ''}</span>
       <span class="activity-amt">${amountLabel}</span>
       ${claimableCell(e)}
       <span class="activity-time">${relativeTime(e.timestamp)}</span>
-    </a>
+    </div>
   `
 }
 

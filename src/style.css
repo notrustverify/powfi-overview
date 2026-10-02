@@ -308,7 +308,11 @@ footer a:hover { color: var(--accent); }
 .filter-btn:hover { border-color: var(--ink-faint); color: var(--ink); }
 .filter-btn.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .activity-list { border: 1px solid var(--surface-border); background: var(--surface); border-radius: 10px; overflow: hidden; }
-.activity-row { display: grid; grid-template-columns: 140px minmax(90px, 1fr) minmax(0, 2fr) 125px 60px; align-items: center; gap: 12px; padding: 18px; text-decoration: none; border-bottom: 1px solid var(--surface-border); }
+.activity-row { position: relative; display: grid; grid-template-columns: 140px minmax(90px, 1fr) minmax(0, 2fr) 125px 60px; align-items: center; gap: 12px; padding: 18px; text-decoration: none; border-bottom: 1px solid var(--surface-border); }
+.activity-transaction { text-decoration: none; }
+.activity-transaction::after { content: ''; position: absolute; inset: 0; }
+.activity-referral a { position: relative; z-index: 1; text-decoration: underline; text-underline-offset: 3px; }
+.activity-referral a:hover { color: var(--ink); }
 .activity-row:last-child { border-bottom: 0; }
 .activity-row:hover { background: rgba(var(--ink-rgb), .035); }
 .kind-badge { display: inline-flex; justify-self: start; border-radius: 4px; padding: 4px 7px; font-size: 12px; font-weight: 600; }
