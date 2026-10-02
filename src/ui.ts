@@ -1,5 +1,7 @@
 import { logoUrl, themeToggleButton } from './theme.ts'
 
+export const GITHUB_REPO_URL = 'https://github.com/notrustverify/powfi-overview'
+
 export function navigation(active: 'overview' | 'activity'): string {
   const base = import.meta.env.BASE_URL
   return `

@@ -3,7 +3,7 @@ import { fetchStakingHistory, MAX_ACTIVITY_EVENTS, EXPLORER_APP_URL, XALPH_VAULT
 import type { StakingActivityEntry, StakingActivityKind } from './chain.ts'
 import { formatNumber, shortAddress, relativeTime, formatRelativeToNow, formatMonthDay, escapeHtml } from './format.ts'
 import { bindThemeToggle, getTheme } from './theme.ts'
-import { navigation } from './ui.ts'
+import { navigation, GITHUB_REPO_URL } from './ui.ts'
 
 const REVEAL_BATCH = 50 // how many more rows to render per scroll trigger — a UI reveal, not a network page
 // Hidden for now: distributeRewards() has never fired on-chain (rewardRate is 0), so this
@@ -154,6 +154,7 @@ function render(): void {
       <footer>
         <span>Data via node.mainnet.alephium.org &amp; backend.mainnet.alephium.org</span>
         <a href="${POWFI_URL}" target="_blank" rel="noopener">powfi.alephium.org ↗</a>
+        <a href="${GITHUB_REPO_URL}" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
       </footer>
     </div>
   `

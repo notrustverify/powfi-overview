@@ -28,7 +28,7 @@ import {
   escapeHtml,
 } from './format.ts'
 import { bindThemeToggle } from './theme.ts'
-import { navigation } from './ui.ts'
+import { navigation, GITHUB_REPO_URL } from './ui.ts'
 
 const REFRESH_INTERVAL_MS = 120_000
 const POWFI_URL = 'https://powfi.alephium.org'
@@ -389,6 +389,7 @@ function render(): void {
           <span>ALPH ${formatUsd(d.poolAlphUsdt.price.price1Per0, 4)} · circulating supply ${formatCompact(d.circulatingAlph)} ALPH · data via node.mainnet.alephium.org &amp; api.powfi.alephium.org</span>
           <a href="${POWFI_URL}" target="_blank" rel="noopener">powfi.alephium.org ↗</a>
           <a href="${POWFI_FAQ_URL}" target="_blank" rel="noopener">FAQ ↗</a>
+          <a href="${GITHUB_REPO_URL}" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
         </span>
       </footer>
     </div>
