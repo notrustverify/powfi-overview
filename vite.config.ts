@@ -10,6 +10,7 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, 'index.html'),
         activity: resolve(import.meta.dirname, 'activity/index.html'),
+        staking: resolve(import.meta.dirname, 'staking/index.html'),
       },
     },
   },

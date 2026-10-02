@@ -80,7 +80,9 @@ function saveRecentAddress(address: string): void {
 }
 
 let recentAddresses = loadRecentAddresses()
-let unstakeAddress = recentAddresses[0] ?? ''
+const linkedAddress = new URLSearchParams(window.location.search).get('address')?.trim()
+let calculatorAddressToLoad = linkedAddress && isAlephiumAddress(linkedAddress) ? linkedAddress : null
+let unstakeAddress = calculatorAddressToLoad ?? recentAddresses[0] ?? ''
 let unstakeLoading = false
 let unstakeError: string | null = null
 let unstakeResult: UnstakeResult | null = null
@@ -232,7 +234,7 @@ function unstakeSection(): string {
     <section class="block" id="calculator">
       <div class="block-head">
         <div><span class="eyebrow">YOUR POSITION</span><h2>Unstake calculator <a class="anchor-link" href="#calculator" aria-label="Link to this section" title="Link to this section">#</a></h2></div>
-        <span class="read-only-label">Read-only · No wallet connection</span>
+        <div class="calculator-actions"><span class="read-only-label">Read-only · No wallet connection</span><a class="refresh-btn calculator-stake-link" href="${import.meta.env.BASE_URL}staking/">Stake with us <span aria-hidden="true">→</span></a></div>
       </div>
       <div class="card unstake-card">
         <label class="input-label" for="unstake-address">Alephium address</label>
@@ -331,7 +333,7 @@ function render(): void {
         <div><span>Staking APR <small>7d average</small></span><strong class="positive">${formatPercent(d.vault.currentAprPct, 2)}</strong>${d.vault.aprIsPartial ? '<small>Partial 7-day window</small>' : ''}</div>
         <div><span>xALPH redemption rate</span><strong>${formatNumber(d.vault.redemptionRate, 6)} <small>ALPH</small></strong></div>
         <div><span>ALPH spot price</span><strong>${formatUsd(d.poolAlphUsdt.price.price1Per0, 4)}</strong></div>
-        <a href="${import.meta.env.BASE_URL}activity">Explore staking activity <span aria-hidden="true">↗</span></a>
+        <a href="${import.meta.env.BASE_URL}activity/">Explore staking activity <span aria-hidden="true">↗</span></a>
       </section>
 
       ${unstakeSection()}
@@ -579,6 +581,12 @@ async function load(): Promise<void> {
   } finally {
     loading = false
     render()
+  }
+  if (data && calculatorAddressToLoad) {
+    const address = calculatorAddressToLoad
+    calculatorAddressToLoad = null
+    void checkUnstake(address)
+    document.getElementById('calculator')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 }
 

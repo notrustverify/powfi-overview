@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test": "node --test tests/*.test.mjs",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview"
@@ -13,7 +14,8 @@
     "vite": "^8.3.0"
   },
   "dependencies": {
+    "@alephium/get-extension-wallet": "3.0.3",
     "@alephium/powfi-sdk": "^1.0.0",
-    "@alephium/web3": "^3.0.4"
+    "@alephium/web3": "3.0.3"
   }
 }

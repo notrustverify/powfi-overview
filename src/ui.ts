@@ -2,7 +2,11 @@ import { logoUrl, themeToggleButton } from './theme.ts'
 
 export const GITHUB_REPO_URL = 'https://github.com/notrustverify/powfi-overview'
 
-export function navigation(active: 'overview' | 'activity'): string {
+export function calculatorUrl(address?: string): string {
+  return `${import.meta.env.BASE_URL}${address ? `?address=${encodeURIComponent(address)}` : ''}#calculator`
+}
+
+export function navigation(active: 'overview' | 'activity' | 'staking', calculatorAddress?: string): string {
   const base = import.meta.env.BASE_URL
   return `
     <header class="topbar">
@@ -12,8 +16,9 @@ export function navigation(active: 'overview' | 'activity'): string {
       </a>
       <nav class="main-nav" aria-label="Main navigation">
         <a class="nav-link ${active === 'overview' ? 'active' : ''}" ${active === 'overview' ? 'aria-current="page"' : ''} href="${base}">Overview</a>
-        <a class="nav-link ${active === 'activity' ? 'active' : ''}" ${active === 'activity' ? 'aria-current="page"' : ''} href="${base}activity">Activity</a>
-        <a class="nav-link" href="${base}#calculator">Calculator</a>
+        <a class="nav-link ${active === 'staking' ? 'active' : ''}" ${active === 'staking' ? 'aria-current="page"' : ''} href="${base}staking/">Stake with us</a>
+        <a class="nav-link ${active === 'activity' ? 'active' : ''}" ${active === 'activity' ? 'aria-current="page"' : ''} href="${base}activity/">Activity</a>
+        <a class="nav-link" href="${calculatorUrl(calculatorAddress)}">Calculator</a>
       </nav>
       <div class="topbar-actions">
         ${themeToggleButton()}

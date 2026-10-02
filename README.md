@@ -13,7 +13,7 @@ mainnet in the browser — there is no server or API key.
 - **xALPH × ALPH pool** (`22QumTFozFy6HyndPMna2t4KjjVNGYNATgY2reeV2d6nj`) — TVL and market
   price vs. the vault's redemption rate (peg deviation).
 
-A second page, `activity.html`, lists the vault's most recent stake / unstake / reward
+A second page, `/activity/`, lists the vault's most recent stake / unstake / reward
 events, decoded straight from its on-chain event log (no private API involved).
 
 Data sources, all called directly from the client:
@@ -26,6 +26,42 @@ Data sources, all called directly from the client:
 
 The campaign targets (20.5M ALPH staked, $200k pool TVL, 5%/15% target APYs, 15% of
 circulating ALPH) are fixed constants in `src/chain.ts` — update them there if a new round changes them.
+
+## Stake directly in the app
+
+The dedicated `/staking/` page, available from the **Stake with us** menu, includes a form using `@alephium/powfi-sdk` and Alephium's
+official extension-wallet connector. Users connect a mainnet wallet, enter ALPH,
+preview the estimated xALPH received, and review/sign in their wallet. The app
+tracks transaction confirmation and refreshes live data afterward. The existing
+unstake calculator remains read-only.
+
+The SDK requires a group-0 mainnet account for this staking vault; the connection
+requests that group. It approves the stake amount plus 0.1 ALPH for transaction
+funding. The form checks the unlocked wallet balance as the amount changes and
+again before submission. **Max** leaves that 0.1 ALPH plus a 0.01 ALPH network
+fee buffer; insufficient funds disable staking. The wallet determines the final
+transaction costs and network fee, which may differ from the buffer.
+
+Stakes default to referral attribution for
+`3cUqrf1qUEpfYRvFjtRP8y7jD3Ssrgh8PmjyAwVj7g1N3aamsypcY`, using
+`powfi.staking.stakeAlphWithReferral(amount, referral)`. To override it, set the
+public build-time variable in `.env.local` or the build environment:
+
+```dotenv
+VITE_STAKING_REFERRAL_ADDRESS=YOUR_ALEPHIUM_ADDRESS
+```
+
+Setting it to an empty string uses `stakeAlph(amount)` without a custom referral.
+Changing build-time values requires restarting Vite or rebuilding. The address
+is included in the public bundle but is not displayed in the interface; it is not a secret.
+
+**Referral attribution is not an additional fee.** The staking SDK exposes a
+referral address, but does not expose an arbitrary app fee recipient/rate in
+these staking methods. This integration adds no app fee and makes no claim that
+referral attribution automatically pays a commission.
+
+Run `npm test` for amount validation and an inert-signer test of the real SDK's
+stake transaction construction. These tests do not sign or broadcast transactions.
 
 ## Generate a shareable staking distribution image
 
