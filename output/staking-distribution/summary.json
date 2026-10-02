@@ -1,0 +1,73 @@
+{
+  "snapshotAt": "2026-10-02T07:13:38.162752+00:00",
+  "source": "https://node.mainnet.alephium.org/events/contract/225WevmFp5ZgzPsyVJTvyp2v2uyKrvp329HfrVmzffnWj",
+  "vaultAddress": "225WevmFp5ZgzPsyVJTvyp2v2uyKrvp329HfrVmzffnWj",
+  "firstStake": "2026-09-14T13:19:02.050000+00:00",
+  "lastStake": "2026-10-02T05:42:48.588000+00:00",
+  "stakeEventCount": 489,
+  "uniqueRecipientAddresses": 285,
+  "duplicateRecordsRemoved": 28,
+  "totalAttoAlph": "11315260108256932721843863",
+  "totalDepositedAlph": 11315260.108256932,
+  "medianAlphPerAddress": 4800.0,
+  "meanAlphPerAddress": 39702.667046515555,
+  "largeAddressSharePct": 10.87719298245614,
+  "largeAddressVolumeSharePct": 73.40097217199263,
+  "bins": [
+    {
+      "range": "Under 100",
+      "lowerInclusiveAlph": 0,
+      "upperExclusiveAlph": 100,
+      "addressCount": 40,
+      "addressSharePct": 14.035087719298245,
+      "depositedAttoAlph": "960520516248146028762",
+      "depositedAlphSharePct": 0.008488717953087426
+    },
+    {
+      "range": "100\u2013<1,000",
+      "lowerInclusiveAlph": 100,
+      "upperExclusiveAlph": 1000,
+      "addressCount": 40,
+      "addressSharePct": 14.035087719298245,
+      "depositedAttoAlph": "16477067787097339633012",
+      "depositedAlphSharePct": 0.1456181089029827
+    },
+    {
+      "range": "1,000\u2013<10,000",
+      "lowerInclusiveAlph": 1000,
+      "upperExclusiveAlph": 10000,
+      "addressCount": 96,
+      "addressSharePct": 33.68421052631579,
+      "depositedAttoAlph": "379235227447384009715897",
+      "depositedAlphSharePct": 3.351537868498929
+    },
+    {
+      "range": "10,000\u2013<100,000",
+      "lowerInclusiveAlph": 10000,
+      "upperExclusiveAlph": 100000,
+      "addressCount": 78,
+      "addressSharePct": 27.368421052631582,
+      "depositedAttoAlph": "2613076369255948201403053",
+      "depositedAlphSharePct": 23.093383132652363
+    },
+    {
+      "range": "100,000\u2013<1 million",
+      "lowerInclusiveAlph": 100000,
+      "upperExclusiveAlph": 1000000,
+      "addressCount": 30,
+      "addressSharePct": 10.526315789473683,
+      "depositedAttoAlph": "6898996566971055025063139",
+      "depositedAlphSharePct": 60.97072891799229
+    },
+    {
+      "range": "1 million or more",
+      "lowerInclusiveAlph": 1000000,
+      "upperExclusiveAlph": null,
+      "addressCount": 1,
+      "addressSharePct": 0.3508771929824561,
+      "depositedAttoAlph": "1406514356279200000000000",
+      "depositedAlphSharePct": 12.430243254000349
+    }
+  ],
+  "methodology": "Sum all Staked-event ALPH amounts by recipient address (field 0). Each recipient contributes one combined observation. Repeated deposits are combined; rewards, scheduled unstakes and cancellations are excluded. Gross historical deposits, not current holdings or unique people; withdrawals and transfers are not subtracted."
+}
