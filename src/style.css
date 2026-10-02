@@ -317,6 +317,8 @@ footer a:hover { color: var(--accent); }
 .kind-cancelled { background: var(--track); color: var(--ink-muted); }
 .kind-reward { background: var(--accent-soft); color: var(--accent); }
 .activity-addr { font-family: var(--mono); font-size: 12px; color: var(--ink-muted); }
+.activity-referral { display: block; margin-top: 5px; font-size: 11px; color: var(--accent); }
+.activity-referral > span { font-family: var(--font); color: var(--ink-faint); }
 .activity-amt { font-family: var(--mono); font-size: 12px; text-align: right; overflow-wrap: anywhere; }
 .activity-time { font-size: 12px; color: var(--ink-faint); text-align: right; }
 .activity-claim { display: flex; flex-direction: column; font-size: 12px; color: var(--warn); }

@@ -76,7 +76,7 @@ function activityRow(e: StakingActivityEntry): string {
   return `
     <a class="activity-row" href="${explorerTxUrl(e.txHash)}" target="_blank" rel="noopener">
       <span class="kind-badge ${KIND_CLASS[e.kind]}">${KIND_LABEL[e.kind]}</span>
-      <span class="activity-addr">${shortAddress(e.address)}</span>
+      <span class="activity-addr"><span title="${escapeHtml(e.address)}">${shortAddress(e.address)}</span>${e.referralAddress ? `<span class="activity-referral" title="Referral: ${escapeHtml(e.referralAddress)}"><span>Referral</span> ${shortAddress(e.referralAddress)}</span>` : ''}</span>
       <span class="activity-amt">${amountLabel}</span>
       ${claimableCell(e)}
       <span class="activity-time">${relativeTime(e.timestamp)}</span>

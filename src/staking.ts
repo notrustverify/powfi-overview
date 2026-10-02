@@ -7,7 +7,7 @@ import { escapeHtml, formatNumber, formatPercent, shortAddress } from './format.
 import { checkStakeFunding, parseStakeAmount, stakeValidation, stakeAmountText, STAKE_FEE_BUFFER } from './stakingAmounts.ts'
 import { calculatorUrl } from './ui.ts'
 
-const DEFAULT_REFERRAL_ADDRESS = '3cUqrf1qUEpfYRvFjtRP8y7jD3Ssrgh8PmjyAwVj7g1N3aamsypcY'
+const DEFAULT_REFERRAL_ADDRESS = '3cUsjeBfMTggytagJXCsvyhtYPy5HydRePWftyE4WBuXSvGvNR2k7'
 const referralAddress = (import.meta.env.VITE_STAKING_REFERRAL_ADDRESS ?? DEFAULT_REFERRAL_ADDRESS).trim()
 const provider = new NodeProvider(NODE_URL)
 const vaultGroup = groupOfAddress(XALPH_VAULT_ADDRESS)

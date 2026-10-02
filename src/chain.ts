@@ -131,6 +131,8 @@ export interface StakingActivityEntry {
   txHash: string
   timestamp: number
   address: string
+  /** Custom referral on a stake; the vault address means no custom referral. */
+  referralAddress?: string
   alphAmount: number
   xalphAmount: number
   /** For 'unstakeScheduled' entries: when the ALPH becomes claimable (timestamp + unstakeDuration). */
@@ -163,7 +165,7 @@ interface ChainEvent {
   fields?: { value: unknown }[]
 }
 
-function decodeStakingEvent(e: ChainEvent): StakingActivityEntry | undefined {
+export function decodeStakingEvent(e: ChainEvent): StakingActivityEntry | undefined {
   const v = (e.fields ?? []).map((f) => f.value as string)
   const base = { txHash: e.txHash, timestamp: e.timestamp }
   switch (e.eventIndex) {
@@ -172,6 +174,7 @@ function decodeStakingEvent(e: ChainEvent): StakingActivityEntry | undefined {
         ...base,
         kind: 'stake',
         address: v[0],
+        referralAddress: v[1] && v[1] !== XALPH_VAULT_ADDRESS && isValidAddress(v[1]) ? v[1] : undefined,
         alphAmount: attoToNumber(v[2], ALPH_DECIMALS),
         xalphAmount: attoToNumber(v[3], ALPH_DECIMALS),
       }

@@ -30,7 +30,7 @@ test('funding check reserves the SDK-required additional ALPH', () => {
 })
 
 test('real SDK builds the expected vault transaction and referral with an inert signer', async () => {
-  const referral = '3cUqrf1qUEpfYRvFjtRP8y7jD3Ssrgh8PmjyAwVj7g1N3aamsypcY'
+  const referral = '3cUsjeBfMTggytagJXCsvyhtYPy5HydRePWftyE4WBuXSvGvNR2k7'
   const vault = '225WevmFp5ZgzPsyVJTvyp2v2uyKrvp329HfrVmzffnWj'
   const caller = '15y5UYQbTbeDHx9YtCHaKH95uEji2S3vTRyoeo9hsuC1'
   const calls = []
@@ -63,6 +63,14 @@ test('staking form disables submission before connection and displays quote with
   try {
     const staking = await server.ssrLoadModule('/src/staking.ts')
     const { calculatorUrl, calculatorAddressFromUrl } = await server.ssrLoadModule('/src/ui.ts')
+    const { decodeStakingEvent, XALPH_VAULT_ADDRESS } = await server.ssrLoadModule('/src/chain.ts')
+    const referral = '3cUsjeBfMTggytagJXCsvyhtYPy5HydRePWftyE4WBuXSvGvNR2k7'
+    const stakeEvent = (address) => ({ txHash: 'test', timestamp: 0, eventIndex: 0, fields: [
+      { value: referral }, { value: address }, { value: '1000000000000000000' }, { value: '1000000000000000000' },
+    ] })
+    assert.equal(decodeStakingEvent(stakeEvent(referral)).referralAddress, referral)
+    assert.equal(decodeStakingEvent(stakeEvent(XALPH_VAULT_ADDRESS)).referralAddress, undefined)
+    assert.equal(decodeStakingEvent(stakeEvent('')).referralAddress, undefined)
     assert.equal(calculatorUrl(), '/#calculator')
     assert.equal(calculatorUrl('wallet-address'), '/#calculator?address=wallet-address')
     for (const path of ['/#calculator?address=wallet-address', '/#calculator?address=wallet-address#calculator', '/?address=wallet-address#calculator']) {
@@ -79,7 +87,7 @@ test('staking form disables submission before connection and displays quote with
     assert.match(html, /Stake ALPH/)
     assert.match(html, /type="submit"[^>]*disabled/)
     assert.match(html, /<strong>50 <small>xALPH<\/small><\/strong>/)
-    assert.doesNotMatch(html, /referral|3cUqrf1qUEpfYRvFjtRP8y7jD3Ssrgh8PmjyAwVj7g1N3aamsypcY/i)
+    assert.doesNotMatch(html, /referral|3cUsjeBfMTggytagJXCsvyhtYPy5HydRePWftyE4WBuXSvGvNR2k7/i)
     assert.match(html, /No additional app fee/)
     handlers.get('staking-amount:input')({ target: { value: '1e3' } })
     assert.match(staking.stakingSection(data), /<strong>— <small>xALPH<\/small><\/strong>/)

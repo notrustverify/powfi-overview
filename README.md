@@ -43,7 +43,7 @@ fee buffer; insufficient funds disable staking. The wallet determines the final
 transaction costs and network fee, which may differ from the buffer.
 
 Stakes default to referral attribution for
-`3cUqrf1qUEpfYRvFjtRP8y7jD3Ssrgh8PmjyAwVj7g1N3aamsypcY`, using
+`3cUsjeBfMTggytagJXCsvyhtYPy5HydRePWftyE4WBuXSvGvNR2k7`, using
 `powfi.staking.stakeAlphWithReferral(amount, referral)`. To override it, set the
 public build-time variable in `.env.local` or the build environment:
 
