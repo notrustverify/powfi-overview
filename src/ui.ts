@@ -3,7 +3,13 @@ import { logoUrl, themeToggleButton } from './theme.ts'
 export const GITHUB_REPO_URL = 'https://github.com/notrustverify/powfi-overview'
 
 export function calculatorUrl(address?: string): string {
-  return `${import.meta.env.BASE_URL}${address ? `?address=${encodeURIComponent(address)}` : ''}#calculator`
+  return `${import.meta.env.BASE_URL}#calculator${address ? `?address=${encodeURIComponent(address)}` : ''}`
+}
+
+export function calculatorAddressFromUrl(url: URL): string | null {
+  const fragment = url.hash.replace(/#calculator$/, '')
+  const parameters = fragment.startsWith('#calculator?') ? fragment.slice('#calculator?'.length) : ''
+  return (new URLSearchParams(parameters).get('address') ?? url.searchParams.get('address'))?.trim() ?? null
 }
 
 export function navigation(active: 'overview' | 'activity' | 'staking', calculatorAddress?: string): string {

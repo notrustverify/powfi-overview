@@ -28,7 +28,7 @@ import {
   escapeHtml,
 } from './format.ts'
 import { bindThemeToggle } from './theme.ts'
-import { navigation, GITHUB_REPO_URL } from './ui.ts'
+import { navigation, GITHUB_REPO_URL, calculatorAddressFromUrl } from './ui.ts'
 
 const REFRESH_INTERVAL_MS = 120_000
 const POWFI_URL = 'https://powfi.alephium.org'
@@ -80,7 +80,7 @@ function saveRecentAddress(address: string): void {
 }
 
 let recentAddresses = loadRecentAddresses()
-const linkedAddress = new URLSearchParams(window.location.search).get('address')?.trim()
+const linkedAddress = calculatorAddressFromUrl(new URL(window.location.href))
 let calculatorAddressToLoad = linkedAddress && isAlephiumAddress(linkedAddress) ? linkedAddress : null
 let unstakeAddress = calculatorAddressToLoad ?? recentAddresses[0] ?? ''
 let unstakeLoading = false
@@ -503,6 +503,10 @@ async function checkUnstake(rawAddress: string): Promise<void> {
     render()
     return
   }
+  const url = new URL(window.location.href)
+  url.searchParams.delete('address')
+  url.hash = `calculator?address=${encodeURIComponent(address)}`
+  window.history.replaceState(null, '', url)
   saveRecentAddress(address)
   if (!data) {
     unstakeError = 'Live data not loaded yet — try again in a moment.'
@@ -591,5 +595,12 @@ async function load(): Promise<void> {
 }
 
 void load()
+window.addEventListener('hashchange', () => {
+  const address = calculatorAddressFromUrl(new URL(window.location.href))
+  if (!address || !isAlephiumAddress(address)) return
+  document.getElementById('calculator')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  if (data) void checkUnstake(address)
+  else calculatorAddressToLoad = address
+})
 setInterval(() => void load(), REFRESH_INTERVAL_MS)
 setInterval(tick, 1000)

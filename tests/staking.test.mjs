@@ -62,9 +62,12 @@ test('staking form disables submission before connection and displays quote with
   const previousDocument = globalThis.document
   try {
     const staking = await server.ssrLoadModule('/src/staking.ts')
-    const { calculatorUrl } = await server.ssrLoadModule('/src/ui.ts')
+    const { calculatorUrl, calculatorAddressFromUrl } = await server.ssrLoadModule('/src/ui.ts')
     assert.equal(calculatorUrl(), '/#calculator')
-    assert.equal(calculatorUrl('wallet-address'), '/?address=wallet-address#calculator')
+    assert.equal(calculatorUrl('wallet-address'), '/#calculator?address=wallet-address')
+    for (const path of ['/#calculator?address=wallet-address', '/#calculator?address=wallet-address#calculator', '/?address=wallet-address#calculator']) {
+      assert.equal(calculatorAddressFromUrl(new URL(path, 'https://example.com')), 'wallet-address')
+    }
     const data = { vault: { currentAprPct: 10, redemptionRate: 2 } }
     const handlers = new Map()
     globalThis.document = {
