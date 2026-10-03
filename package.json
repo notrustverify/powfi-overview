@@ -16,7 +16,6 @@
     "vite": "^8.3.0"
   },
   "dependencies": {
-    "@alephium/get-extension-wallet": "3.0.3",
     "@alephium/powfi-sdk": "^1.0.1",
     "@alephium/web3": "3.0.3",
     "@alephium/web3-react": "3.0.3",
