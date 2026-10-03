@@ -29,11 +29,16 @@ circulating ALPH) are fixed constants in `src/chain.ts` — update them there if
 
 ## Stake directly in the app
 
-The dedicated `/staking/` page, available from the **Stake with us** menu, includes a form using `@alephium/powfi-sdk` and Alephium's
-official extension-wallet connector. Users connect a mainnet wallet, enter ALPH,
+The dedicated `/staking/` page, available from the **Stake with us** menu, includes a form using `@alephium/powfi-sdk` and the official `@alephium/web3-react`
+`AlephiumWalletProvider`. The chooser supports browser extensions, the desktop
+wallet, and WalletConnect. Users connect a mainnet wallet, enter ALPH,
 preview the estimated xALPH received, and review/sign in their wallet. The app
 tracks transaction confirmation and refreshes live data afterward. The existing
-unstake calculator remains read-only.
+unstake calculator remains read-only. Disconnect waits for connector cleanup and
+clears the provider state; clicking Connect wallet afterward reopens the method
+chooser. The wallet provider stays mounted while the form updates. Desktop and
+WalletConnect sessions reconnect only after choosing a method, so an offline
+wallet cannot block the chooser during page load.
 
 The SDK requires a group-0 mainnet account for this staking vault; the connection
 requests that group. It approves the stake amount plus 0.1 ALPH for transaction

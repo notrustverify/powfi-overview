@@ -1,6 +1,6 @@
 import { NodeProvider, groupOfAddress, isValidAddress, MINIMAL_CONTRACT_DEPOSIT } from '@alephium/web3'
 import type { Account, SignerProvider } from '@alephium/web3'
-import type { AlephiumWindowObject } from '@alephium/get-extension-wallet'
+import type { Wallet } from '@alephium/web3-react'
 import type { DashboardData } from './chain.ts'
 import { NODE_URL, EXPLORER_APP_URL, XALPH_VAULT_ADDRESS } from './chain.ts'
 import { escapeHtml, formatNumber, formatPercent, shortAddress } from './format.ts'
@@ -11,11 +11,14 @@ const DEFAULT_REFERRAL_ADDRESS = '3cUsjeBfMTggytagJXCsvyhtYPy5HydRePWftyE4WBuXSv
 const referralAddress = (import.meta.env.VITE_STAKING_REFERRAL_ADDRESS ?? DEFAULT_REFERRAL_ADDRESS).trim()
 const provider = new NodeProvider(NODE_URL)
 const vaultGroup = groupOfAddress(XALPH_VAULT_ADDRESS)
-let wallet: AlephiumWindowObject | undefined
+let wallet: SignerProvider | undefined
+let connectedNetwork: string | undefined
+let walletActions: { show: () => void; disconnect: () => Promise<void> } | undefined
 let account: Account | undefined
 let available: bigint | undefined
 let amountInput = ''
 let connecting = false
+let disconnecting = false
 let signing = false
 let error = ''
 let transaction: { txId: string; confirmed: boolean } | undefined
@@ -42,32 +45,68 @@ async function refreshBalance(): Promise<void> {
 
 function clearConnection(): void {
   wallet = undefined
+  connectedNetwork = undefined
   account = undefined
   available = undefined
   onChange()
 }
 
-async function connect(): Promise<void> {
-  connecting = true
+export function setStakingWalletActions(actions: { show: () => void; disconnect: () => Promise<void> }): void {
+  walletActions = actions
+}
+
+export function updateStakingWallet(state: Wallet): void {
+  connecting = state.connectionStatus === 'connecting'
+  if (state.connectionStatus !== 'connected') {
+    clearConnection()
+    return
+  }
+  if (state.account.network !== 'mainnet' || groupOfAddress(state.account.address) !== vaultGroup) {
+    clearConnection()
+    error = `Select an Alephium mainnet address in group ${vaultGroup} in your wallet.`
+    onChange()
+    return
+  }
+  const changed = wallet !== state.signer || account?.address !== state.account.address
+  wallet = state.signer
+  account = state.account
+  connectedNetwork = state.account.network
+  if (changed) {
+    available = undefined
+    error = ''
+    void refreshBalance().catch(() => {
+      error = 'Unable to load your wallet balance. Reconnect to try again.'
+    }).finally(onChange)
+  }
+  onChange()
+}
+
+function connect(): void {
+  if (connecting || disconnecting || signing || wallet) return
+  error = ''
+  try {
+    if (!walletActions) throw new Error('The wallet chooser is loading. Try again in a moment.')
+    walletActions.show()
+  } catch (err) {
+    error = err instanceof Error ? err.message : 'Unable to open the wallet chooser.'
+  }
+  onChange()
+}
+
+async function disconnect(): Promise<void> {
+  if (!wallet || connecting || disconnecting || signing) return
+  const connected = wallet
+  disconnecting = true
   error = ''
   onChange()
   try {
-    const { getDefaultAlephiumWallet } = await import('@alephium/get-extension-wallet')
-    const extension = await getDefaultAlephiumWallet()
-    if (!extension) throw new Error('Install the Alephium browser extension wallet, then connect again.')
-    const selected = await extension.enable({ networkId: 'mainnet', addressGroup: vaultGroup, onDisconnected: clearConnection })
-    if (!selected) throw new Error('Wallet connection was cancelled.')
-    if (extension.connectedNetworkId !== 'mainnet' || groupOfAddress(selected.address) !== vaultGroup) {
-      throw new Error(`Select an Alephium mainnet address in group ${vaultGroup} in your wallet.`)
-    }
-    wallet = extension
-    account = selected
-    await refreshBalance()
+    if (!walletActions) throw new Error('Wallet connection is unavailable. Try again.')
+    await walletActions.disconnect()
+    if (wallet === connected) clearConnection()
   } catch (err) {
-    clearConnection()
-    error = err instanceof Error ? err.message : 'Unable to connect to the wallet.'
+    error = err instanceof Error ? err.message : 'Unable to disconnect the wallet. Try again.'
   } finally {
-    connecting = false
+    disconnecting = false
     onChange()
   }
 }
@@ -96,7 +135,7 @@ async function checkConfirmation(): Promise<void> {
 }
 
 async function submitStake(): Promise<void> {
-  if (signing || connecting || (transaction && !transaction.confirmed)) return
+  if (signing || connecting || disconnecting || (transaction && !transaction.confirmed)) return
   error = ''
   signing = true
   onChange()
@@ -105,7 +144,7 @@ async function submitStake(): Promise<void> {
     const signer = wallet
     const expectedAddress = account.address
     const selected = await signer.getSelectedAccount()
-    if (signer.connectedNetworkId !== 'mainnet' || groupOfAddress(selected.address) !== vaultGroup || selected.address !== expectedAddress) {
+    if (connectedNetwork !== 'mainnet' || groupOfAddress(selected.address) !== vaultGroup || selected.address !== expectedAddress) {
       clearConnection()
       throw new Error('Your wallet account or network changed. Connect again before staking.')
     }
@@ -117,10 +156,7 @@ async function submitStake(): Promise<void> {
     }
     checkStakeFunding(amount, available, MINIMAL_CONTRACT_DEPOSIT)
     const { Powfi } = await import('@alephium/powfi-sdk')
-    // The extension's CJS declarations and SDK's ESM declarations each resolve
-    // the same pinned Web3 SignerProvider, but TS treats their protected members
-    // as different classes. The runtime wallet implements this signer API.
-    const powfi = Powfi.load({ networkId: 'mainnet', signer: signer as unknown as SignerProvider, networkOverrides: { nodeUrl: NODE_URL } })
+    const powfi = Powfi.load({ networkId: 'mainnet', signer, networkOverrides: { nodeUrl: NODE_URL } })
     powfi.setCurrentProviders()
     if (powfi.staking.getConfig().xAlphTokenAddress !== XALPH_VAULT_ADDRESS) {
       throw new Error('The SDK staking vault does not match the dashboard vault.')
@@ -148,7 +184,7 @@ export function stakingSection(data: DashboardData): string {
   const invalidReferral = Boolean(referralAddress && !isValidAddress(referralAddress))
   const validation = stakeValidation(amountInput, available, MINIMAL_CONTRACT_DEPOSIT)
   const maxStake = available === undefined ? undefined : available > MINIMAL_CONTRACT_DEPOSIT + STAKE_FEE_BUFFER ? available - MINIMAL_CONTRACT_DEPOSIT - STAKE_FEE_BUFFER : 0n
-  const canStake = Boolean(account && amount && available !== undefined && !validation && !signing && !connecting && !pending && !invalidReferral)
+  const canStake = Boolean(account && amount && available !== undefined && !validation && !signing && !connecting && !disconnecting && !pending && !invalidReferral)
   const buttonText = signing ? 'Review in wallet…' : pending ? 'Waiting for confirmation…' : !account ? 'Connect wallet to stake' : available === undefined ? 'Balance unavailable' : validation && amount ? 'Insufficient ALPH' : !amount ? 'Enter an amount' : 'Stake ALPH →'
   return `
     <section class="staking-layout" id="stake" aria-label="Stake ALPH">
@@ -158,7 +194,7 @@ export function stakingSection(data: DashboardData): string {
         <a class="staking-position-link" href="${calculatorUrl(account?.address)}">Check your position and earned yield <span aria-hidden="true">↗</span></a>
       </div>
       <div class="card staking-card"><div class="staking-card-heading"><span class="eyebrow">LIQUID STAKING</span><h2>Stake ALPH</h2><p>Deposit ALPH. Receive yield-bearing xALPH.</p></div>
-        <div class="staking-wallet"><div><strong>${account ? `Connected · ${shortAddress(account.address)}` : 'Your wallet'}</strong><p>${account ? `Available: ${available === undefined ? 'Unable to load balance' : `${formatNumber(Number(available) / 1e18, 4)} ALPH`}` : 'Connect the Alephium browser extension wallet to stake here.'}</p></div><button type="button" class="refresh-btn" id="staking-connect" ${connecting || signing ? 'disabled' : ''}>${connecting ? 'Connecting…' : account ? 'Disconnect' : 'Connect wallet'}</button></div>
+        <div class="staking-wallet"><div><strong>${account ? `Connected · ${shortAddress(account.address)}` : 'Your wallet'}</strong><p>${account ? `Available: ${available === undefined ? 'Unable to load balance' : `${formatNumber(Number(available) / 1e18, 4)} ALPH`}` : 'Choose your browser, desktop, or WalletConnect wallet.'}</p></div><button type="button" class="refresh-btn" id="staking-connect" ${connecting || disconnecting || signing ? 'disabled' : ''}>${disconnecting ? 'Disconnecting…' : connecting ? 'Connecting…' : account ? 'Disconnect' : 'Connect wallet'}</button></div>
         <form id="staking-form" class="staking-form">
           <div><div class="staking-input-heading"><label class="input-label" for="staking-amount">You stake</label><button class="staking-max" id="staking-max" type="button" ${!maxStake || signing || pending ? 'disabled' : ''}>Max</button></div><div class="staking-amount-wrap"><input id="staking-amount" class="addr-input" type="text" inputmode="decimal" value="${escapeHtml(amountInput)}" placeholder="0.00" autocomplete="off" aria-invalid="${Boolean(validation)}" aria-describedby="staking-help staking-validation${error ? ' staking-error' : ''}" ${signing || pending ? 'disabled' : ''}/><span>ALPH</span></div><p class="staking-validation ${validation ? 'is-error' : ''}" id="staking-validation" role="status">${validation ? escapeHtml(validation) : account && maxStake !== undefined ? `Available to stake: ${stakeAmountText(maxStake)} ALPH` : 'Connect your wallet to check your available balance.'}</p></div>
           <div class="staking-quote"><span>You receive · estimated</span><strong>${estimate === undefined ? '—' : formatNumber(estimate, 6)} <small>xALPH</small></strong></div>
@@ -183,11 +219,8 @@ export function bindStaking(): void {
     onChange()
   })
   document.getElementById('staking-connect')?.addEventListener('click', () => {
-    if (wallet) {
-      const connected = wallet
-      clearConnection()
-      void connected.disconnect().catch(() => {})
-    } else void connect()
+    if (wallet) void disconnect()
+    else connect()
   })
   document.getElementById('staking-amount')?.addEventListener('input', (e) => {
     amountInput = (e.target as HTMLInputElement).value

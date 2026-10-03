@@ -6,6 +6,8 @@ import { bindThemeToggle } from './theme.ts'
 import { navigation, GITHUB_REPO_URL } from './ui.ts'
 import { stakingSection, bindStaking, initializeStaking, connectedStakingAddress } from './staking.ts'
 
+import { mountWalletConnection } from './walletConnection.ts'
+
 const app = document.querySelector<HTMLDivElement>('#app')!
 let data: DashboardData | undefined
 let loading = false
@@ -50,5 +52,6 @@ async function load(): Promise<void> {
 }
 
 initializeStaking(render, () => void load())
+mountWalletConnection()
 void load()
 window.setInterval(() => void load(), 120_000)

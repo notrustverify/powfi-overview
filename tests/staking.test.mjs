@@ -106,3 +106,59 @@ test('live balance validation includes funding and fee buffer, with exact max am
   assert.equal(stakeAmountText(balance - MINIMAL_CONTRACT_DEPOSIT - STAKE_FEE_BUFFER), '10')
   assert.equal(stakeAmountText(1n), '0.000000000000000001')
 })
+
+test('reconnect reopens the chooser only after provider disconnection finishes', async () => {
+  const previousDocument = globalThis.document
+  const previousFetch = globalThis.fetch
+  const handlers = new Map()
+  let finishDisconnect
+  let disconnectFails = false
+  let showCount = 0
+  const address = '15y5UYQbTbeDHx9YtCHaKH95uEji2S3vTRyoeo9hsuC1'
+  globalThis.document = { getElementById: (id) => ({ addEventListener: (kind, handler) => handlers.set(`${id}:${kind}`, handler) }) }
+  globalThis.fetch = async () => new Response(JSON.stringify({ balance: '10000000000000000000', lockedBalance: '0' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  const server = await createServer({ server: { middlewareMode: true, ws: false, hmr: false, watch: null } })
+  const waitUntil = async (predicate) => {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      if (predicate()) return
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    assert.fail('Wallet state transition did not finish')
+  }
+  try {
+    const staking = await server.ssrLoadModule('/src/staking.ts')
+    const data = { vault: { currentAprPct: 10, redemptionRate: 1 } }
+    const html = () => staking.stakingSection(data)
+    staking.initializeStaking(() => staking.bindStaking(), () => {})
+    staking.setStakingWalletActions({
+      show: () => showCount++,
+      disconnect: () => disconnectFails ? Promise.reject(new Error('Disconnect failed')) : new Promise((resolve) => { finishDisconnect = resolve }),
+    })
+    staking.bindStaking()
+    const click = () => handlers.get('staking-connect:click')()
+    click()
+    assert.equal(showCount, 1)
+    staking.updateStakingWallet({ connectionStatus: 'connected', account: { address, network: 'mainnet' }, signer: {} })
+    await waitUntil(() => html().includes('Available: 10 ALPH'))
+    click()
+    assert.match(html(), /disabled>Disconnecting…/)
+    staking.updateStakingWallet({ connectionStatus: 'disconnected' })
+    click()
+    assert.equal(showCount, 1)
+    finishDisconnect()
+    await waitUntil(() => !html().includes('Disconnecting…'))
+    click()
+    assert.equal(showCount, 2)
+    staking.updateStakingWallet({ connectionStatus: 'connected', account: { address, network: 'mainnet' }, signer: {} })
+    await waitUntil(() => html().includes('Available: 10 ALPH'))
+    disconnectFails = true
+    click()
+    await waitUntil(() => html().includes('Disconnect failed'))
+    assert.equal(staking.connectedStakingAddress(), address)
+    assert.doesNotMatch(html(), /Disconnecting…/)
+  } finally {
+    globalThis.document = previousDocument
+    globalThis.fetch = previousFetch
+    await server.close()
+  }
+})
