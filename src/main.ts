@@ -153,7 +153,7 @@ function explorerAddrUrl(addr: string): string {
 
 function unstakeResultHtml(r: UnstakeResult): string {
   const lpXalph = r.lpPositions.reduce((s, p) => s + p.xalphAmount, 0)
-  const pendingAlph = r.pendingUnstakes.reduce((s, p) => s + p.totalUnstakeAmount, 0)
+  const pendingAlph = r.pendingUnstakes.reduce((s, p) => s + p.remainingUnstakeAmount, 0)
   const pendingClaimableNow = r.pendingUnstakes.reduce((s, p) => s + p.claimableNow, 0)
   const hasXalph = r.xalphBalance + lpXalph > 0
   const differenceAlph = Math.abs(r.alphAtMarket - r.alphAtRedemption)
@@ -530,7 +530,7 @@ async function checkUnstake(rawAddress: string): Promise<void> {
     const lpPositions = lpResult.status === 'fulfilled' ? lpResult.value : []
 
     const lpXalph = lpPositions.reduce((s, p) => s + p.xalphAmount, 0)
-    const pendingAlph = pendingUnstakes.reduce((s, p) => s + p.totalUnstakeAmount, 0)
+    const pendingAlph = pendingUnstakes.reduce((s, p) => s + p.remainingUnstakeAmount, 0)
     const totalXalph = xalphBalance + lpXalph
 
     // Real swap quote (fee + price impact included) rather than amount × spot price;

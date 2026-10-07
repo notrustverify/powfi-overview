@@ -6,7 +6,7 @@
 import { ExplorerProvider, addressFromContractId, contractIdFromAddress, binToHex, ALPH_TOKEN_ID } from '@alephium/web3'
 import { Powfi, ClmmContracts, TickUtils, ClmmLiquidityUtils, PoolUtils } from '@alephium/powfi-sdk'
 import type { Powfi as PowfiInstance } from '@alephium/powfi-sdk'
-import { EXPLORER_API_URL, XALPH_TOKEN_ID, POOL_XALPH_ALPH_ADDRESS } from './chain.ts'
+import { NODE_URL, EXPLORER_API_URL, XALPH_TOKEN_ID, POOL_XALPH_ALPH_ADDRESS } from './chain.ts'
 
 const ALPH_DECIMALS = 18
 const EXPLORER_EVENTS_PAGE_SIZE = 100
@@ -19,7 +19,10 @@ function attoToNumber(atto: string | bigint, decimals: number): number {
 let powfiSingleton: PowfiInstance | null = null
 function getPowfi(): PowfiInstance {
   if (!powfiSingleton) {
-    powfiSingleton = Powfi.load({ networkId: 'mainnet' })
+    // load() registers the providers; use the dashboard endpoints consistently.
+    powfiSingleton = Powfi.load({ networkId: 'mainnet', networkOverrides: { nodeUrl: NODE_URL, explorerUrl: EXPLORER_API_URL } })
+  } else {
+    // A staking instance may have replaced the generated bindings' defaults.
     powfiSingleton.setCurrentProviders()
   }
   return powfiSingleton
@@ -27,7 +30,7 @@ function getPowfi(): PowfiInstance {
 
 export interface PendingUnstake {
   vaultIndex: bigint
-  totalUnstakeAmount: number // ALPH, already burned from xALPH supply — not affected by redemption/market rate
+  remainingUnstakeAmount: number // ALPH still in the vault, excluding amounts already withdrawn
   claimableNow: number // ALPH, linearly vested so far
   claimableAt: number // ms timestamp when the full amount is claimable
 }
@@ -45,7 +48,7 @@ export async function fetchPendingUnstakes(address: string): Promise<PendingUnst
       ])
       return {
         vaultIndex,
-        totalUnstakeAmount: attoToNumber(state.fields.totalUnstakeAmount, ALPH_DECIMALS),
+        remainingUnstakeAmount: attoToNumber(state.fields.totalUnstakeAmount - state.fields.withdrawnAmount, ALPH_DECIMALS),
         claimableNow: attoToNumber(claimable, ALPH_DECIMALS),
         claimableAt: Number(state.fields.unstakeStartTime) + Number(state.fields.unstakeDuration),
       }

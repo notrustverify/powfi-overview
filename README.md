@@ -29,6 +29,14 @@ circulating ALPH) are fixed constants in `src/chain.ts` — update them there if
 
 ## Stake directly in the app
 
+The app pins `@alephium/powfi-sdk` to **1.0.2**. Integration details are in the
+[PowFi developer guide](https://docs.powfi.alephium.org/developer-guide).
+All wallet and SDK dependencies share `@alephium/web3` 3.0.4 to avoid duplicate
+provider registries; check this with `npm ls @alephium/web3` when upgrading.
+SDK instances use the dashboard's node and explorer endpoints. `Powfi.load()`
+registers providers automatically; a reused read-only instance restores its
+providers before querying. Pending unstake totals exclude ALPH already withdrawn.
+
 The dedicated `/staking/` page, available from the **Stake with us** menu, includes a form using `@alephium/powfi-sdk` and the official `@alephium/web3-react`
 `AlephiumWalletProvider`. The chooser supports browser extensions, the desktop
 wallet, and WalletConnect. Users connect a mainnet wallet, enter ALPH,
@@ -64,6 +72,9 @@ is included in the public bundle but is not displayed in the interface; it is no
 referral address, but does not expose an arbitrary app fee recipient/rate in
 these staking methods. This integration adds no app fee and makes no claim that
 referral attribution automatically pays a commission.
+The [partner guide](https://docs.powfi.alephium.org/guides/referral-staking)
+explains that commission requires an agreement with the PowFi team and is settled
+off-chain; the referral address is recorded in the stake event.
 
 Run `npm test` for amount validation and an inert-signer test of the real SDK's
 stake transaction construction. These tests do not sign or broadcast transactions.

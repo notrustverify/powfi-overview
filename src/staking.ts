@@ -157,7 +157,6 @@ async function submitStake(): Promise<void> {
     checkStakeFunding(amount, available, MINIMAL_CONTRACT_DEPOSIT)
     const { Powfi } = await import('@alephium/powfi-sdk')
     const powfi = Powfi.load({ networkId: 'mainnet', signer, networkOverrides: { nodeUrl: NODE_URL } })
-    powfi.setCurrentProviders()
     if (powfi.staking.getConfig().xAlphTokenAddress !== XALPH_VAULT_ADDRESS) {
       throw new Error('The SDK staking vault does not match the dashboard vault.')
     }

@@ -121,6 +121,44 @@ test('live balance validation includes funding and fee buffer, with exact max am
   assert.equal(stakeAmountText(1n), '0.000000000000000001')
 })
 
+test('pending unstake totals exclude partial withdrawals and reuse configured providers', async () => {
+  const server = await createServer({ server: { middlewareMode: true, ws: false, hmr: false, watch: null } })
+  const originalLoad = Powfi.load
+  let loadConfig
+  let providerRestores = 0
+  try {
+    Powfi.load = (config) => {
+      loadConfig = config
+      return {
+        setCurrentProviders: () => providerRestores++,
+        staking: {
+          getActiveUnstakeVaultIndexes: async () => [1n, 2n],
+          getAlphUnstakeVaultState: async (_address, index) => ({ fields: {
+            totalUnstakeAmount: parseStakeAmount('100'),
+            withdrawnAmount: index === 1n ? parseStakeAmount('40') : 0n,
+            unstakeStartTime: 1000n,
+            unstakeDuration: 2000n,
+          } }),
+          getClaimableAmount: async () => parseStakeAmount('10'),
+        },
+      }
+    }
+    const { fetchPendingUnstakes } = await server.ssrLoadModule('/src/xalphPositions.ts')
+    const { NODE_URL, EXPLORER_API_URL } = await server.ssrLoadModule('/src/chain.ts')
+    const pending = await fetchPendingUnstakes('test-address')
+    assert.deepEqual(pending.map((request) => request.remainingUnstakeAmount), [60, 100])
+    assert.equal(pending[0].claimableNow, 10)
+    assert.equal(pending[0].claimableAt, 3000)
+    assert.deepEqual(loadConfig, { networkId: 'mainnet', networkOverrides: { nodeUrl: NODE_URL, explorerUrl: EXPLORER_API_URL } })
+    assert.equal(providerRestores, 0, 'load registers providers automatically')
+    await fetchPendingUnstakes('test-address')
+    assert.equal(providerRestores, 1, 'a reused instance restores its provider context')
+  } finally {
+    Powfi.load = originalLoad
+    await server.close()
+  }
+})
+
 test('reconnect reopens the chooser only after provider disconnection finishes', async () => {
   const previousDocument = globalThis.document
   const previousFetch = globalThis.fetch
