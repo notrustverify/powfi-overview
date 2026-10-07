@@ -3,6 +3,20 @@ const ATTO_PER_ALPH = 10n ** 18n
 // The wallet calculates the actual network fee before approval.
 export const STAKE_FEE_BUFFER = 10n ** 16n
 
+function ungroupStakeInput(value: string): string {
+  // Only remove correctly grouped thousands separators; ambiguous pasted
+  // decimals such as "1,5" must not silently become a different amount.
+  return /^\d{1,3}(?:,\d{3})+(?:\.\d*)?$/.test(value) ? value.replaceAll(',', '') : value
+}
+
+/** Group the whole amount without rounding or changing unfinished decimals. */
+export function formatStakeInput(value: string): string {
+  const normalized = ungroupStakeInput(value.trim())
+  if (!/^\d+(?:\.\d*)?$/.test(normalized)) return value
+  const [whole, fraction] = normalized.split('.')
+  return whole!.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (fraction === undefined ? '' : `.${fraction}`)
+}
+
 export function stakeAmountText(amount: bigint): string {
   const fraction = (amount % ATTO_PER_ALPH).toString().padStart(18, '0').replace(/0+$/, '')
   return `${amount / ATTO_PER_ALPH}${fraction ? `.${fraction}` : ''}`
@@ -23,7 +37,7 @@ export function stakeValidation(input: string, available: bigint | undefined, fu
 
 /** Parse ALPH without rounding user-specified precision. */
 export function parseStakeAmount(value: string): bigint {
-  const normalized = value.trim()
+  const normalized = ungroupStakeInput(value.trim())
   if (!/^\d+(?:\.\d{1,18})?$/.test(normalized)) {
     throw new Error('Enter a positive ALPH amount with up to 18 decimal places.')
   }

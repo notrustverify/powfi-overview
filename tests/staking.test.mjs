@@ -8,7 +8,7 @@ import { MINIMAL_CONTRACT_DEPOSIT, addressToBytes, binToHex, contractIdFromAddre
 
 const source = await readFile(new URL('../src/stakingAmounts.ts', import.meta.url), 'utf8')
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext } }).outputText
-const { parseStakeAmount, checkStakeFunding, stakeValidation, stakeAmountText, STAKE_FEE_BUFFER } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)
+const { parseStakeAmount, checkStakeFunding, stakeValidation, stakeAmountText, formatStakeInput, STAKE_FEE_BUFFER } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)
 
 test('ALPH parsing preserves one attoALPH and large decimal amounts exactly', () => {
   assert.equal(parseStakeAmount('0.000000000000000001'), 1n)
@@ -18,9 +18,17 @@ test('ALPH parsing preserves one attoALPH and large decimal amounts exactly', ()
 })
 
 test('invalid, zero, negative, exponential and over-precision inputs are rejected', () => {
-  for (const input of ['', '0', '0.000', '-1', '1e3', '1,000', 'Infinity', 'NaN', '1.2.3', '0.0000000000000000001']) {
+  for (const input of ['', '0', '0.000', '-1', '1e3', '1,5', '12,34', 'Infinity', 'NaN', '1.2.3', '0.0000000000000000001']) {
     assert.throws(() => parseStakeAmount(input), undefined, input)
   }
+})
+
+test('grouped staking amounts preserve precision and unfinished decimals', () => {
+  assert.equal(formatStakeInput('1234567.123456789123456789'), '1,234,567.123456789123456789')
+  assert.equal(parseStakeAmount('1,234,567.123456789123456789'), parseStakeAmount('1234567.123456789123456789'))
+  assert.equal(formatStakeInput('1000.'), '1,000.')
+  assert.equal(formatStakeInput('1000.00'), '1,000.00')
+  assert.equal(formatStakeInput('1,5'), '1,5')
 })
 
 test('funding check reserves the SDK-required additional ALPH', () => {
@@ -89,6 +97,12 @@ test('staking form disables submission before connection and displays quote with
     assert.match(html, /<strong>50 <small>xALPH<\/small><\/strong>/)
     assert.doesNotMatch(html, /referral|3cUsjeBfMTggytagJXCsvyhtYPy5HydRePWftyE4WBuXSvGvNR2k7/i)
     assert.match(html, /No additional app fee/)
+    const input = { value: '1,0234.50', selectionStart: 3, selectionEnd: 3, setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end } }
+    handlers.get('staking-amount:input')({ target: input, inputType: 'insertText' })
+    assert.equal(input.value, '10,234.50')
+    assert.equal(input.selectionStart, 2)
+    assert.match(staking.stakingSection(data), /value="10,234.50"/)
+    assert.match(staking.stakingSection(data), /<strong>5,117.25 <small>xALPH/)
     handlers.get('staking-amount:input')({ target: { value: '1e3' } })
     assert.match(staking.stakingSection(data), /<strong>— <small>xALPH<\/small><\/strong>/)
     assert.match(staking.stakingSection(data), /aria-invalid="true"/)

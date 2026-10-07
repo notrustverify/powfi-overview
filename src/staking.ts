@@ -4,7 +4,7 @@ import type { Wallet } from '@alephium/web3-react'
 import type { DashboardData } from './chain.ts'
 import { NODE_URL, EXPLORER_APP_URL, XALPH_VAULT_ADDRESS } from './chain.ts'
 import { escapeHtml, formatNumber, formatPercent, shortAddress } from './format.ts'
-import { checkStakeFunding, parseStakeAmount, stakeValidation, stakeAmountText, STAKE_FEE_BUFFER } from './stakingAmounts.ts'
+import { checkStakeFunding, parseStakeAmount, stakeValidation, stakeAmountText, formatStakeInput, STAKE_FEE_BUFFER } from './stakingAmounts.ts'
 import { calculatorUrl } from './ui.ts'
 
 const DEFAULT_REFERRAL_ADDRESS = '3cUsjeBfMTggytagJXCsvyhtYPy5HydRePWftyE4WBuXSvGvNR2k7'
@@ -214,7 +214,7 @@ export function bindStaking(): void {
     if (available === undefined || signing || (transaction && !transaction.confirmed)) return
     const max = available - MINIMAL_CONTRACT_DEPOSIT - STAKE_FEE_BUFFER
     if (max <= 0n) return
-    amountInput = stakeAmountText(max)
+    amountInput = formatStakeInput(stakeAmountText(max))
     error = ''
     onChange()
   })
@@ -223,7 +223,28 @@ export function bindStaking(): void {
     else connect()
   })
   document.getElementById('staking-amount')?.addEventListener('input', (e) => {
-    amountInput = (e.target as HTMLInputElement).value
+    const input = e.target as HTMLInputElement
+    const original = input.value
+    const inputType = (e as InputEvent).inputType
+    const previousValid = !amountInput || /^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d*)?$/.test(amountInput)
+    const editing = previousValid && (e as InputEvent).data !== ',' && (inputType === 'insertText' || inputType?.startsWith('delete'))
+    amountInput = formatStakeInput(editing ? original.replaceAll(',', '') : original)
+    // Preserve the editing position as commas appear/disappear. The page
+    // renderer captures this adjusted selection before replacing the form.
+    if (amountInput !== original && input.selectionStart != null && input.selectionEnd != null) {
+      const selection = [input.selectionStart, input.selectionEnd].map((position) => {
+        const characters = original.slice(0, position).replaceAll(',', '').length
+        let offset = 0
+        let seen = 0
+        while (offset < amountInput.length && seen < characters) {
+          if (amountInput[offset] !== ',') seen++
+          offset++
+        }
+        return offset
+      })
+      input.value = amountInput
+      input.setSelectionRange(selection[0]!, selection[1]!)
+    }
     error = ''
     onChange()
   })
